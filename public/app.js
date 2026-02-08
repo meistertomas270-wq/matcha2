@@ -75,6 +75,7 @@ const zodiacHint = document.getElementById("zodiacHint");
 const photoFilesInput = document.getElementById("photoFilesInput");
 const photoUrlsInput = document.getElementById("photoUrlsInput");
 const photoCountHint = document.getElementById("photoCountHint");
+const photoPreview = document.getElementById("photoPreview");
 const interestsPicker = document.getElementById("interestsPicker");
 const interestsInput = document.getElementById("interestsInput");
 const relationshipPicker = document.getElementById("relationshipPicker");
@@ -268,7 +269,10 @@ function bindEvents() {
 async function onCreateProfile(event) {
   event.preventDefault();
   syncBirthData();
-  const photoUrls = await readPhotoFiles(photoFilesInput?.files);
+  let photoUrls = await readPhotoFiles(photoFilesInput?.files);
+  if (!photoUrls.length && Array.isArray(state.user?.photoUrls) && state.user.photoUrls.length) {
+    photoUrls = state.user.photoUrls.slice(0, 5);
+  }
   if (!photoUrls.length) {
     showToast("Sube al menos 1 foto");
     return;
@@ -938,6 +942,9 @@ function openOnboarding() {
   closeDialog(authDialog);
   if (state.user) {
     hydrateOnboardingFromUser(state.user);
+  } else {
+    renderPhotoPreview([]);
+    photoCountHint.textContent = "0/5 seleccionadas";
   }
   if (dobInput && !dobInput.value) {
     const d = new Date();
@@ -1076,6 +1083,10 @@ function hydrateOnboardingFromUser(user) {
     relationshipGoalInput,
     user.relationshipGoal ? [user.relationshipGoal] : []
   );
+  renderPhotoPreview(Array.isArray(user.photoUrls) ? user.photoUrls.slice(0, 5) : []);
+  photoCountHint.textContent = Array.isArray(user.photoUrls)
+    ? `${Math.min(user.photoUrls.length, 5)}/5 actuales`
+    : "0/5 seleccionadas";
   syncBirthData();
 }
 
@@ -1139,6 +1150,23 @@ async function onPhotosChanged() {
   if (count > 5) {
     showToast("Maximo 5 fotos");
   }
+  const previewUrls = await readPhotoFiles(files);
+  renderPhotoPreview(previewUrls);
+}
+
+function renderPhotoPreview(urls) {
+  if (!photoPreview) return;
+  const list = Array.isArray(urls) ? urls.slice(0, 5) : [];
+  if (!list.length) {
+    photoPreview.innerHTML = "";
+    return;
+  }
+  photoPreview.innerHTML = list
+    .map(
+      (url, idx) =>
+        `<img class="photo-preview-item" src="${escapeHtml(url)}" alt="Foto ${idx + 1}" loading="lazy" />`
+    )
+    .join("");
 }
 
 function syncPoliticsPronouns() {

@@ -923,6 +923,20 @@ body {
   gap: 6px;
 }
 
+.photo-preview {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.photo-preview-item {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(183, 216, 235, 0.36);
+}
+
 .modal-form .inline-toggle {
   flex-direction: row;
   align-items: center;
@@ -1045,6 +1059,7 @@ body {
   position: fixed;
   left: 50%;
   bottom: 92px;
+  z-index: 1200;
   transform: translateX(-50%) translateY(14px);
   border-radius: 999px;
   padding: 10px 16px;
