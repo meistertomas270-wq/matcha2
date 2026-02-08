@@ -1,23 +1,31 @@
-const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const webpush = require("web-push");
 const { v4: uuidv4 } = require("uuid");
+const { Pool } = require("pg");
 
 dotenv.config();
 
 const firebaseAdmin = safeRequire("firebase-admin");
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DATABASE_URL = process.env.DATABASE_URL || "";
 
-const DATA_DIR = path.join(__dirname, "data");
-const DB_FILE = path.join(DATA_DIR, "db.json");
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL is required. Add Railway Postgres and set this variable.");
 }
+
+const useDbSsl =
+  process.env.DATABASE_SSL === "true" ||
+  DATABASE_URL.includes("railway.app") ||
+  DATABASE_URL.includes("railway.internal");
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: useDbSsl ? { rejectUnauthorized: false } : false,
+});
 
 const defaultUsers = [
   {
@@ -76,21 +84,6 @@ const defaultUsers = [
   },
 ];
 
-const emptyDb = {
-  users: defaultUsers,
-  swipes: [],
-  matches: [],
-  pushSubscriptions: [],
-  deviceTokens: [],
-};
-
-if (!fs.existsSync(DB_FILE)) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(emptyDb, null, 2), "utf8");
-}
-
-let db = loadDb();
-let firebaseMessaging = null;
-
 const vapidKeys = loadVapidKeys();
 webpush.setVapidDetails(
   process.env.VAPID_EMAIL || "mailto:matcha@example.com",
@@ -98,80 +91,124 @@ webpush.setVapidDetails(
   vapidKeys.privateKey
 );
 
+let firebaseMessaging = null;
 initFirebase();
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/health", (_req, res) => {
-  res.json({
-    ok: true,
-    service: "matcha",
-    now: new Date().toISOString(),
-    users: db.users.length,
-  });
+app.get("/health", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*)::int AS users FROM users");
+    return res.json({
+      ok: true,
+      service: "matcha",
+      now: new Date().toISOString(),
+      users: rows[0]?.users || 0,
+    });
+  } catch (err) {
+    console.error("health_error", err);
+    return res.status(500).json({ ok: false, error: "health_failed" });
+  }
 });
 
-app.post("/api/auth/guest", (req, res) => {
-  const { name, age, city, bio, photoUrl } = req.body || {};
-  if (!name || !name.trim()) {
-    return res.status(400).json({ ok: false, error: "name_required" });
-  }
+app.post("/api/auth/guest", async (req, res) => {
+  try {
+    const { name, age, city, bio, photoUrl } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ ok: false, error: "name_required" });
+    }
 
-  const safeAge = Number(age) || 25;
-  const user = {
-    id: `u_${uuidv4()}`,
-    name: String(name).trim().slice(0, 30),
-    age: Math.max(18, Math.min(99, safeAge)),
-    city: String(city || "Sin ciudad").slice(0, 40),
-    bio: String(bio || "Nuevo en Matcha").slice(0, 180),
-    photoUrl:
+    const userId = `u_${uuidv4()}`;
+    const safeAge = Number(age) || 25;
+    const values = [
+      userId,
+      String(name).trim().slice(0, 30),
+      Math.max(18, Math.min(99, safeAge)),
+      String(city || "Sin ciudad").slice(0, 40),
+      String(bio || "Nuevo en Matcha").slice(0, 180),
       String(photoUrl || "").trim() ||
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
-    createdAt: new Date().toISOString(),
-  };
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
+    ];
 
-  db.users.push(user);
-  saveDb();
+    const { rows } = await pool.query(
+      `
+      INSERT INTO users (id, name, age, city, bio, photo_url, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      RETURNING id, name, age, city, bio, photo_url AS "photoUrl", created_at AS "createdAt"
+      `,
+      values
+    );
 
-  return res.json({
-    ok: true,
-    user,
-    token: Buffer.from(user.id).toString("base64url"),
-  });
+    return res.json({
+      ok: true,
+      user: rows[0],
+      token: Buffer.from(userId).toString("base64url"),
+    });
+  } catch (err) {
+    console.error("guest_auth_error", err);
+    return res.status(500).json({ ok: false, error: "guest_auth_failed" });
+  }
 });
 
-app.get("/api/users/:userId", (req, res) => {
-  const user = db.users.find((u) => u.id === req.params.userId);
-  if (!user) {
-    return res.status(404).json({ ok: false, error: "user_not_found" });
+app.get("/api/users/:userId", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT id, name, age, city, bio, photo_url AS "photoUrl", created_at AS "createdAt"
+      FROM users
+      WHERE id = $1
+      `,
+      [req.params.userId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ ok: false, error: "user_not_found" });
+    }
+    return res.json({ ok: true, user: rows[0] });
+  } catch (err) {
+    console.error("get_user_error", err);
+    return res.status(500).json({ ok: false, error: "get_user_failed" });
   }
-  return res.json({ ok: true, user });
 });
 
-app.get("/api/profiles/stack", (req, res) => {
-  const userId = String(req.query.userId || "");
-  const limit = Math.max(1, Math.min(20, Number(req.query.limit) || 8));
-  if (!userId) {
-    return res.status(400).json({ ok: false, error: "userId_required" });
-  }
-  const user = db.users.find((u) => u.id === userId);
-  if (!user) {
-    return res.status(404).json({ ok: false, error: "user_not_found" });
-  }
+app.get("/api/profiles/stack", async (req, res) => {
+  try {
+    const userId = String(req.query.userId || "");
+    const limit = Math.max(1, Math.min(20, Number(req.query.limit) || 8));
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: "userId_required" });
+    }
 
-  const swipedTargets = new Set(
-    db.swipes.filter((s) => s.userId === userId).map((s) => s.targetId)
-  );
-  const candidates = db.users
-    .filter((u) => u.id !== userId && !swipedTargets.has(u.id))
-    .slice(0, limit);
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (!userExists.rowCount) {
+      return res.status(404).json({ ok: false, error: "user_not_found" });
+    }
 
-  return res.json({ ok: true, profiles: candidates });
+    const { rows } = await pool.query(
+      `
+      SELECT u.id, u.name, u.age, u.city, u.bio, u.photo_url AS "photoUrl", u.created_at AS "createdAt"
+      FROM users u
+      WHERE u.id <> $1
+        AND NOT EXISTS (
+          SELECT 1 FROM swipes s
+          WHERE s.user_id = $1 AND s.target_id = u.id
+        )
+      ORDER BY u.created_at DESC
+      LIMIT $2
+      `,
+      [userId, limit]
+    );
+
+    return res.json({ ok: true, profiles: rows });
+  } catch (err) {
+    console.error("profiles_stack_error", err);
+    return res.status(500).json({ ok: false, error: "profiles_stack_failed" });
+  }
 });
 
 app.post("/api/swipes", async (req, res) => {
+  const client = await pool.connect();
   try {
     const { userId, targetId, direction } = req.body || {};
     if (!userId || !targetId || !direction) {
@@ -180,148 +217,209 @@ app.post("/api/swipes", async (req, res) => {
     if (!["like", "pass"].includes(direction)) {
       return res.status(400).json({ ok: false, error: "invalid_direction" });
     }
-
-    const user = db.users.find((u) => u.id === userId);
-    const target = db.users.find((u) => u.id === targetId);
-    if (!user || !target) {
-      return res.status(404).json({ ok: false, error: "user_not_found" });
-    }
     if (userId === targetId) {
       return res.status(400).json({ ok: false, error: "invalid_target" });
     }
 
-    const existingSwipe = db.swipes.find(
-      (s) => s.userId === userId && s.targetId === targetId
+    await client.query("BEGIN");
+    const usersCheck = await client.query(
+      "SELECT id FROM users WHERE id = ANY($1::text[])",
+      [[userId, targetId]]
     );
-    if (!existingSwipe) {
-      db.swipes.push({
-        id: `sw_${uuidv4()}`,
-        userId,
-        targetId,
-        direction,
-        createdAt: new Date().toISOString(),
-      });
-    } else {
-      existingSwipe.direction = direction;
-      existingSwipe.updatedAt = new Date().toISOString();
+    if (usersCheck.rowCount < 2) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ ok: false, error: "user_not_found" });
     }
 
-    let match = null;
+    await client.query(
+      `
+      INSERT INTO swipes (id, user_id, target_id, direction, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (user_id, target_id)
+      DO UPDATE SET direction = EXCLUDED.direction, updated_at = NOW()
+      `,
+      [`sw_${uuidv4()}`, userId, targetId, direction]
+    );
+
+    let matchRow = null;
+    let isNewMatch = false;
+
     if (direction === "like") {
-      const reciprocalLike = db.swipes.find(
-        (s) =>
-          s.userId === targetId &&
-          s.targetId === userId &&
-          s.direction === "like"
+      const reciprocal = await client.query(
+        `
+        SELECT id
+        FROM swipes
+        WHERE user_id = $1 AND target_id = $2 AND direction = 'like'
+        LIMIT 1
+        `,
+        [targetId, userId]
       );
-      if (reciprocalLike) {
-        const alreadyMatched = db.matches.find(
-          (m) => m.users.includes(userId) && m.users.includes(targetId)
+
+      if (reciprocal.rowCount) {
+        const [userA, userB] = sortPair(userId, targetId);
+        const pairKey = `${userA}::${userB}`;
+
+        const inserted = await client.query(
+          `
+          INSERT INTO matches (id, user_a, user_b, pair_key, created_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (pair_key) DO NOTHING
+          RETURNING id, user_a, user_b, created_at
+          `,
+          [`m_${uuidv4()}`, userA, userB, pairKey]
         );
-        if (!alreadyMatched) {
-          match = {
-            id: `m_${uuidv4()}`,
-            users: [userId, targetId],
-            createdAt: new Date().toISOString(),
-          };
-          db.matches.push(match);
-          await notifyNewMatch(match);
+
+        if (inserted.rowCount) {
+          matchRow = inserted.rows[0];
+          isNewMatch = true;
         } else {
-          match = alreadyMatched;
+          const existing = await client.query(
+            `
+            SELECT id, user_a, user_b, created_at
+            FROM matches
+            WHERE pair_key = $1
+            LIMIT 1
+            `,
+            [pairKey]
+          );
+          if (existing.rowCount) {
+            matchRow = existing.rows[0];
+          }
         }
       }
     }
 
-    saveDb();
-    return res.json({ ok: true, isMatch: Boolean(match), match });
+    await client.query("COMMIT");
+
+    if (isNewMatch && matchRow) {
+      await notifyNewMatch(matchRow);
+    }
+
+    return res.json({
+      ok: true,
+      isMatch: Boolean(matchRow),
+      match: matchRow ? formatMatch(matchRow) : null,
+    });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("swipe_error", err);
     return res.status(500).json({ ok: false, error: "swipe_failed" });
+  } finally {
+    client.release();
   }
 });
 
-app.get("/api/matches", (req, res) => {
-  const userId = String(req.query.userId || "");
-  if (!userId) {
-    return res.status(400).json({ ok: false, error: "userId_required" });
-  }
-  const matches = db.matches
-    .filter((m) => m.users.includes(userId))
-    .map((match) => {
-      const otherUserId = match.users.find((id) => id !== userId);
-      const user = db.users.find((u) => u.id === otherUserId);
-      return {
-        id: match.id,
-        createdAt: match.createdAt,
-        user,
-      };
-    })
-    .filter((m) => m.user);
+app.get("/api/matches", async (req, res) => {
+  try {
+    const userId = String(req.query.userId || "");
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: "userId_required" });
+    }
 
-  return res.json({ ok: true, matches });
+    const { rows } = await pool.query(
+      `
+      SELECT
+        m.id AS match_id,
+        m.created_at,
+        u.id AS user_id,
+        u.name,
+        u.age,
+        u.city,
+        u.bio,
+        u.photo_url
+      FROM matches m
+      JOIN users u
+        ON u.id = CASE WHEN m.user_a = $1 THEN m.user_b ELSE m.user_a END
+      WHERE m.user_a = $1 OR m.user_b = $1
+      ORDER BY m.created_at DESC
+      `,
+      [userId]
+    );
+
+    const matches = rows.map((r) => ({
+      id: r.match_id,
+      createdAt: r.created_at,
+      user: {
+        id: r.user_id,
+        name: r.name,
+        age: r.age,
+        city: r.city,
+        bio: r.bio,
+        photoUrl: r.photo_url,
+      },
+    }));
+
+    return res.json({ ok: true, matches });
+  } catch (err) {
+    console.error("matches_error", err);
+    return res.status(500).json({ ok: false, error: "matches_failed" });
+  }
 });
 
 app.get("/api/push/public-key", (_req, res) => {
   return res.json({ ok: true, publicKey: vapidKeys.publicKey });
 });
 
-app.post("/api/push/subscribe", (req, res) => {
-  const { userId, subscription } = req.body || {};
-  if (!userId || !subscription || !subscription.endpoint) {
-    return res.status(400).json({ ok: false, error: "invalid_payload" });
-  }
-  const user = db.users.find((u) => u.id === userId);
-  if (!user) {
-    return res.status(404).json({ ok: false, error: "user_not_found" });
-  }
+app.post("/api/push/subscribe", async (req, res) => {
+  try {
+    const { userId, subscription } = req.body || {};
+    if (!userId || !subscription || !subscription.endpoint) {
+      return res.status(400).json({ ok: false, error: "invalid_payload" });
+    }
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (!userExists.rowCount) {
+      return res.status(404).json({ ok: false, error: "user_not_found" });
+    }
 
-  const existing = db.pushSubscriptions.find(
-    (s) => s.userId === userId && s.endpoint === subscription.endpoint
-  );
-  if (!existing) {
-    db.pushSubscriptions.push({
-      id: `ps_${uuidv4()}`,
-      userId,
-      endpoint: subscription.endpoint,
-      subscription,
-      createdAt: new Date().toISOString(),
-    });
-  } else {
-    existing.subscription = subscription;
-    existing.updatedAt = new Date().toISOString();
-  }
-  saveDb();
+    await pool.query(
+      `
+      INSERT INTO push_subscriptions (id, user_id, endpoint, subscription, created_at)
+      VALUES ($1, $2, $3, $4::jsonb, NOW())
+      ON CONFLICT (endpoint)
+      DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        subscription = EXCLUDED.subscription,
+        updated_at = NOW()
+      `,
+      [`ps_${uuidv4()}`, userId, subscription.endpoint, JSON.stringify(subscription)]
+    );
 
-  return res.json({ ok: true });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("push_subscribe_error", err);
+    return res.status(500).json({ ok: false, error: "push_subscribe_failed" });
+  }
 });
 
 app.post("/api/device/register", async (req, res) => {
-  const { userId, token, platform } = req.body || {};
-  if (!userId || !token) {
-    return res.status(400).json({ ok: false, error: "invalid_payload" });
-  }
-  const user = db.users.find((u) => u.id === userId);
-  if (!user) {
-    return res.status(404).json({ ok: false, error: "user_not_found" });
-  }
+  try {
+    const { userId, token, platform } = req.body || {};
+    if (!userId || !token) {
+      return res.status(400).json({ ok: false, error: "invalid_payload" });
+    }
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (!userExists.rowCount) {
+      return res.status(404).json({ ok: false, error: "user_not_found" });
+    }
 
-  const existing = db.deviceTokens.find((d) => d.token === token);
-  if (!existing) {
-    db.deviceTokens.push({
-      id: `dt_${uuidv4()}`,
-      userId,
-      token,
-      platform: platform || "android",
-      createdAt: new Date().toISOString(),
-    });
-  } else {
-    existing.userId = userId;
-    existing.platform = platform || existing.platform;
-    existing.updatedAt = new Date().toISOString();
-  }
-  saveDb();
+    await pool.query(
+      `
+      INSERT INTO device_tokens (id, user_id, token, platform, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (token)
+      DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        platform = EXCLUDED.platform,
+        updated_at = NOW()
+      `,
+      [`dt_${uuidv4()}`, userId, token, platform || "android"]
+    );
 
-  return res.json({ ok: true });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("device_register_error", err);
+    return res.status(500).json({ ok: false, error: "device_register_failed" });
+  }
 });
 
 app.get("*", (req, res, next) => {
@@ -331,41 +429,109 @@ app.get("*", (req, res, next) => {
   return res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, () => {
-  console.log(`matcha server ready on http://localhost:${PORT}`);
-  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-    console.log(
-      "warning: using generated VAPID keys for this run. Configure env vars for stable push subscriptions."
-    );
-  }
-  if (!firebaseMessaging) {
-    console.log(
-      "warning: firebase not configured. Android FCM push is disabled."
-    );
-  }
+startServer().catch((err) => {
+  console.error("startup_error", err);
+  process.exit(1);
 });
 
-function loadDb() {
-  try {
-    const raw = fs.readFileSync(DB_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    return {
-      users: Array.isArray(parsed.users) ? parsed.users : [],
-      swipes: Array.isArray(parsed.swipes) ? parsed.swipes : [],
-      matches: Array.isArray(parsed.matches) ? parsed.matches : [],
-      pushSubscriptions: Array.isArray(parsed.pushSubscriptions)
-        ? parsed.pushSubscriptions
-        : [],
-      deviceTokens: Array.isArray(parsed.deviceTokens) ? parsed.deviceTokens : [],
-    };
-  } catch (err) {
-    console.error("db_load_error", err);
-    return JSON.parse(JSON.stringify(emptyDb));
-  }
+async function startServer() {
+  await initDb();
+  app.listen(PORT, () => {
+    console.log(`matcha server ready on http://localhost:${PORT}`);
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      console.log(
+        "warning: using generated VAPID keys for this run. Configure env vars for stable push subscriptions."
+      );
+    }
+    if (!firebaseMessaging) {
+      console.log(
+        "warning: firebase not configured. Android remote push is disabled, web push still works."
+      );
+    }
+  });
 }
 
-function saveDb() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+async function initDb() {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        age INT NOT NULL,
+        city TEXT NOT NULL,
+        bio TEXT NOT NULL,
+        photo_url TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS swipes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        target_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        direction TEXT NOT NULL CHECK (direction IN ('like', 'pass')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ,
+        UNIQUE (user_id, target_id)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS matches (
+        id TEXT PRIMARY KEY,
+        user_a TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_b TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        pair_key TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        subscription JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS device_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform TEXT NOT NULL DEFAULT 'android',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ
+      );
+    `);
+
+    const existing = await client.query("SELECT COUNT(*)::int AS count FROM users");
+    if ((existing.rows[0]?.count || 0) === 0) {
+      for (const u of defaultUsers) {
+        await client.query(
+          `
+          INSERT INTO users (id, name, age, city, bio, photo_url, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          `,
+          [u.id, u.name, u.age, u.city, u.bio, u.photoUrl]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 function loadVapidKeys() {
@@ -405,10 +571,16 @@ function initFirebase() {
   }
 }
 
-async function notifyNewMatch(match) {
-  const [userAId, userBId] = match.users;
-  const userA = db.users.find((u) => u.id === userAId);
-  const userB = db.users.find((u) => u.id === userBId);
+async function notifyNewMatch(matchRow) {
+  const userAId = matchRow.user_a;
+  const userBId = matchRow.user_b;
+  const { rows } = await pool.query(
+    "SELECT id, name FROM users WHERE id = ANY($1::text[])",
+    [[userAId, userBId]]
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const userA = byId.get(userAId);
+  const userB = byId.get(userBId);
   if (!userA || !userB) {
     return;
   }
@@ -438,8 +610,11 @@ async function notifyNewMatch(match) {
 }
 
 async function sendWebPushToUser(userId, title, body) {
-  const subscriptions = db.pushSubscriptions.filter((s) => s.userId === userId);
-  if (!subscriptions.length) {
+  const { rows } = await pool.query(
+    "SELECT endpoint, subscription FROM push_subscriptions WHERE user_id = $1",
+    [userId]
+  );
+  if (!rows.length) {
     return;
   }
   const payload = JSON.stringify({
@@ -450,12 +625,12 @@ async function sendWebPushToUser(userId, title, body) {
 
   const failed = [];
   await Promise.all(
-    subscriptions.map(async (item) => {
+    rows.map(async (item) => {
       try {
         await webpush.sendNotification(item.subscription, payload);
       } catch (err) {
-        const statusCode = err?.statusCode;
-        if (statusCode === 404 || statusCode === 410) {
+        const code = err?.statusCode;
+        if (code === 404 || code === 410) {
           failed.push(item.endpoint);
         }
       }
@@ -463,10 +638,10 @@ async function sendWebPushToUser(userId, title, body) {
   );
 
   if (failed.length) {
-    db.pushSubscriptions = db.pushSubscriptions.filter(
-      (s) => !failed.includes(s.endpoint)
+    await pool.query(
+      "DELETE FROM push_subscriptions WHERE endpoint = ANY($1::text[])",
+      [failed]
     );
-    saveDb();
   }
 }
 
@@ -474,10 +649,12 @@ async function sendFcmToUser(userId, title, body) {
   if (!firebaseMessaging) {
     return;
   }
-  const tokens = db.deviceTokens
-    .filter((d) => d.userId === userId)
-    .map((d) => d.token);
 
+  const { rows } = await pool.query(
+    "SELECT token FROM device_tokens WHERE user_id = $1",
+    [userId]
+  );
+  const tokens = rows.map((r) => r.token);
   if (!tokens.length) {
     return;
   }
@@ -509,12 +686,23 @@ async function sendFcmToUser(userId, title, body) {
     });
 
     if (invalid.length) {
-      db.deviceTokens = db.deviceTokens.filter((d) => !invalid.includes(d.token));
-      saveDb();
+      await pool.query("DELETE FROM device_tokens WHERE token = ANY($1::text[])", [invalid]);
     }
   } catch (err) {
     console.error("fcm_send_error", err);
   }
+}
+
+function formatMatch(row) {
+  return {
+    id: row.id,
+    users: [row.user_a, row.user_b],
+    createdAt: row.created_at,
+  };
+}
+
+function sortPair(a, b) {
+  return [a, b].sort((x, y) => x.localeCompare(y));
 }
 
 function safeRequire(moduleName) {

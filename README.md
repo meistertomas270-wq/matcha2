@@ -4,6 +4,7 @@ Matcha is a Tinder-style project ready for:
 - Web deploy on Railway (Node.js + Express + web app).
 - Android Studio WebView app (Kotlin).
 - Push notifications on web (Web Push) and Android (Firebase FCM).
+- PostgreSQL persistence for users, swipes, matches, and subscriptions.
 
 ## 1) What is included
 
@@ -19,6 +20,14 @@ Matcha is a Tinder-style project ready for:
 Requirements:
 - Node.js 20+
 - npm
+- PostgreSQL database
+
+Set env vars (or `.env`):
+
+```env
+DATABASE_URL=postgresql://user:password@host:5432/database
+DATABASE_SSL=true
+```
 
 Install and run:
 
@@ -37,12 +46,15 @@ http://localhost:3000
 
 1. Push this project to GitHub (you can use `subir_github.bat`).
 2. In Railway, create a new project from that GitHub repo.
-3. Add environment variables in Railway:
+3. Add a PostgreSQL service in Railway and connect it to this app service.
+4. Add environment variables in Railway:
+- `DATABASE_URL` (usually auto-exposed by Railway Postgres reference)
+- `DATABASE_SSL=true`
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
 - `VAPID_EMAIL` (example: `mailto:you@domain.com`)
-- `FIREBASE_SERVICE_ACCOUNT` (optional, base64 JSON, needed for Android push)
-4. Deploy. Railway will run `npm start`.
+- `FIREBASE_SERVICE_ACCOUNT` (optional, base64 JSON, only for Android remote push)
+5. Deploy. Railway will run `npm start`.
 
 Generate VAPID keys:
 
@@ -106,6 +118,6 @@ subir_github.bat https://github.com/your-user/your-repo.git
 
 ## 8) Important production notes
 
-- Current persistence uses local JSON file (`data/db.json`) for simplicity.
-- On Railway, filesystem is ephemeral. For real production scale, migrate to Postgres.
+- Persistence is PostgreSQL-first. No file-based DB is used.
 - Current auth is guest-mode (no passwords). Add secure auth for production.
+- For Android remote push while app is closed, Firebase FCM is required.
