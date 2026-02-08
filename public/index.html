@@ -125,6 +125,7 @@
           <div class="profile-actions">
             <button id="btnNotifProfile" class="settings-btn" type="button">Activar notificaciones</button>
             <button id="btnResetProfile" class="settings-btn danger-line" type="button">Cambiar perfil</button>
+            <button id="btnLogoutProfile" class="settings-btn danger-line" type="button">Cerrar sesion</button>
           </div>
         </section>
       </main>
@@ -141,135 +142,298 @@
 
   <dialog id="onboardingDialog" class="modal">
     <form id="onboardingForm" class="modal-form">
-      <h2>Crear perfil Matcha</h2>
+      <h2>Editar perfil</h2>
+
       <label>
         Nombre
         <input name="name" maxlength="30" required placeholder="Tu nombre" />
       </label>
+
       <label>
-        Edad
-        <input name="age" type="number" min="18" max="99" value="25" required />
+        Fecha de nacimiento
+        <input id="dobInput" name="dob" type="date" required />
       </label>
-      <label>
-        Ciudad
-        <input name="city" maxlength="40" placeholder="Tu ciudad" />
-      </label>
+      <input id="ageInput" name="age" type="hidden" />
+      <input id="zodiacInput" name="zodiacSign" type="hidden" />
+
       <label>
         Bio
         <textarea name="bio" maxlength="180" rows="3" required placeholder="Conta algo de vos"></textarea>
       </label>
+
       <label>
-        URL de foto
-        <input name="photoUrl" type="url" placeholder="https://..." />
+        Fotos (maximo 5)
+        <input id="photoFilesInput" type="file" accept="image/*" multiple required />
       </label>
+      <small id="photoCountHint">0/5 seleccionadas</small>
+      <input id="photoUrlsInput" name="photoUrls" type="hidden" />
+
+      <div class="onb-group">
+        <p>Intereses (maximo 6)</p>
+        <div id="interestsPicker" class="chip-grid" data-max="6">
+          <button type="button" class="chip-btn" data-value="Entrenamiento">Entrenamiento</button>
+          <button type="button" class="chip-btn" data-value="Karaoke">Karaoke</button>
+          <button type="button" class="chip-btn" data-value="Padel">Padel</button>
+          <button type="button" class="chip-btn" data-value="YouTube">YouTube</button>
+          <button type="button" class="chip-btn" data-value="Marvel">Marvel</button>
+          <button type="button" class="chip-btn" data-value="Cine">Cine</button>
+          <button type="button" class="chip-btn" data-value="Series">Series</button>
+          <button type="button" class="chip-btn" data-value="Viajes">Viajes</button>
+          <button type="button" class="chip-btn" data-value="Cocinar">Cocinar</button>
+          <button type="button" class="chip-btn" data-value="Gaming">Gaming</button>
+          <button type="button" class="chip-btn" data-value="Musica">Musica</button>
+          <button type="button" class="chip-btn" data-value="Futbol">Futbol</button>
+        </div>
+        <input id="interestsInput" name="interests" type="hidden" required />
+      </div>
+
+      <div class="onb-group">
+        <p>Que tipo de relacion buscas</p>
+        <div id="relationshipPicker" class="chip-grid single">
+          <button type="button" class="chip-btn" data-value="🎉 Diversion">🎉 Diversion</button>
+          <button type="button" class="chip-btn" data-value="🤝 Hacer amigos">🤝 Hacer amigos</button>
+          <button type="button" class="chip-btn" data-value="🤔 Lo sigo pensando">🤔 Lo sigo pensando</button>
+          <button type="button" class="chip-btn" data-value="✨ Diversion pero no me cierro">✨ Diversion pero no me cierro</button>
+          <button type="button" class="chip-btn" data-value="💞 Relacion pero no me cierro">💞 Relacion pero no me cierro</button>
+          <button type="button" class="chip-btn" data-value="💍 Relacion">💍 Relacion</button>
+        </div>
+        <input id="relationshipGoalInput" name="relationshipGoal" type="hidden" required />
+      </div>
+
       <label>
-        Intereses (min. 3, separados por coma)
-        <input name="interests" required placeholder="Padel, Karaoke, Marvel, ..." />
+        Politica
+        <select id="politicsInput" name="politics" required>
+          <option value="derecha" selected>Derecha</option>
+          <option value="izquierda">Izquierda</option>
+        </select>
       </label>
-      <label>
-        Meta de relacion
-        <input name="relationshipGoal" maxlength="40" required placeholder="Relacion seria" />
+
+      <label id="pronounsWrap" hidden>
+        Pronombres
+        <select name="pronouns">
+          <option value="">Selecciona</option>
+          <option value="el/el">el/el</option>
+          <option value="ella/ella">ella/ella</option>
+          <option value="elle/elle">elle/elle</option>
+        </select>
       </label>
+
       <label>
         Sexo
-        <input name="gender" maxlength="30" required placeholder="Hombre, Mujer, No binario..." />
+        <select name="gender" required>
+          <option value="">Selecciona</option>
+          <option>Hombre</option>
+          <option>Mujer</option>
+          <option>No binario</option>
+        </select>
       </label>
+
       <label>
         Orientacion sexual
-        <input name="sexualOrientation" maxlength="40" placeholder="Heterosexual, Bisexual..." />
+        <select name="sexualOrientation">
+          <option value="">Selecciona</option>
+          <option>Heterosexual</option>
+          <option>Bisexual</option>
+          <option>Homosexual</option>
+          <option>Pansexual</option>
+          <option>Asexual</option>
+        </select>
       </label>
-      <label>
-        Pronombres
-        <input name="pronouns" maxlength="30" placeholder="el/el, ella/ella, elle/elle..." />
-      </label>
+
       <label>
         Altura (cm)
-        <input name="heightCm" type="number" min="120" max="230" placeholder="175" />
+        <select name="heightCm">
+          <option value="">Selecciona</option>
+          <option>150</option><option>155</option><option>160</option><option>165</option><option>170</option>
+          <option>175</option><option>180</option><option>185</option><option>190</option><option>195</option>
+        </select>
       </label>
-      <label>
-        Idiomas (separados por coma)
-        <input name="languages" placeholder="Espanol, Ingles" />
+
+      <div class="onb-group">
+        <p>Idiomas</p>
+        <div id="languagesPicker" class="chip-grid" data-max="4">
+          <button type="button" class="chip-btn" data-value="Espanol">Espanol</button>
+          <button type="button" class="chip-btn" data-value="Ingles">Ingles</button>
+          <button type="button" class="chip-btn" data-value="Portugues">Portugues</button>
+          <button type="button" class="chip-btn" data-value="Italiano">Italiano</button>
+          <button type="button" class="chip-btn" data-value="Frances">Frances</button>
+        </div>
+        <input id="languagesInput" name="languages" type="hidden" />
+      </div>
+
+      <label class="inline-toggle">
+        Mostrar signo zodiacal
+        <input id="showZodiacInput" name="showZodiac" type="checkbox" checked />
       </label>
-      <label>
-        Signo zodiacal
-        <input name="zodiacSign" maxlength="20" placeholder="Leo" />
-      </label>
-      <label>
-        Nivel educativo
-        <input name="education" maxlength="50" placeholder="Universitario" />
-      </label>
-      <label>
-        Planes familiares
-        <input name="familyPlans" maxlength="60" placeholder="Quiero hijos algun dia" />
-      </label>
-      <label>
-        Estilo de amor
-        <input name="loveStyle" maxlength="40" placeholder="Tiempo de calidad" />
-      </label>
-      <label>
-        Mascotas
-        <input name="pets" maxlength="40" placeholder="Quiero una mascota" />
-      </label>
-      <label>
-        Beber
-        <input name="drinking" maxlength="30" placeholder="No es lo mio" />
-      </label>
-      <label>
-        Fumar
-        <input name="smoking" maxlength="30" placeholder="No fumo" />
-      </label>
-      <label>
-        Ejercicio
-        <input name="workout" maxlength="30" placeholder="A veces" />
-      </label>
-      <label>
-        Redes sociales
-        <input name="socialMedia" maxlength="30" placeholder="Poco" />
-      </label>
+      <small id="zodiacHint">Signo calculado: -</small>
+
+      <details class="fold-select">
+        <summary>Nivel educativo</summary>
+        <select name="education">
+          <option value="">Selecciona</option>
+          <option>Secundario</option>
+          <option>Terciario</option>
+          <option>Universitario</option>
+          <option>Posgrado</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Planes familiares</summary>
+        <select name="familyPlans">
+          <option value="">Selecciona</option>
+          <option>Quiero hijos</option>
+          <option>No quiero hijos</option>
+          <option>Tal vez</option>
+          <option>Prefiero hablarlo</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Estilo de amor</summary>
+        <select name="loveStyle">
+          <option value="">Selecciona</option>
+          <option>Tiempo de calidad</option>
+          <option>Detalles</option>
+          <option>Contacto fisico</option>
+          <option>Palabras de afirmacion</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Mascotas</summary>
+        <select name="pets">
+          <option value="">Selecciona</option>
+          <option>Tengo mascotas</option>
+          <option>Quiero mascota</option>
+          <option>No tengo ni quiero</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Beber</summary>
+        <select name="drinking">
+          <option value="">Selecciona</option>
+          <option>No bebo</option>
+          <option>Socialmente</option>
+          <option>Los fines de semana</option>
+          <option>Prefiero no decir</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Fumar</summary>
+        <select name="smoking">
+          <option value="">Selecciona</option>
+          <option>No fumo</option>
+          <option>Ocasionalmente</option>
+          <option>Si fumo</option>
+          <option>Prefiero no decir</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Ejercicio</summary>
+        <select name="workout">
+          <option value="">Selecciona</option>
+          <option>Todos los dias</option>
+          <option>3-4 veces por semana</option>
+          <option>1-2 veces por semana</option>
+          <option>Casi nunca</option>
+        </select>
+      </details>
+
+      <details class="fold-select">
+        <summary>Redes sociales</summary>
+        <select name="socialMedia">
+          <option value="">Selecciona</option>
+          <option>Todo el dia</option>
+          <option>Bastante</option>
+          <option>Poco</option>
+          <option>Casi nada</option>
+        </select>
+      </details>
+
       <label>
         Prompt sobre mi
-        <input name="aboutPromptQuestion" maxlength="80" placeholder="Tendras la llave de mi corazon si..." />
+        <select name="aboutPromptQuestion">
+          <option value="">Selecciona</option>
+          <option>Tendras la llave de mi corazon si...</option>
+          <option>Mi cita ideal seria...</option>
+          <option>Me conquistas cuando...</option>
+        </select>
       </label>
       <label>
         Respuesta prompt
-        <input name="aboutPromptAnswer" maxlength="140" placeholder="Te gusta la ciencia" />
+        <input name="aboutPromptAnswer" maxlength="140" placeholder="Tu respuesta" />
       </label>
+
       <label>
         Preguntame sobre #1
-        <input name="askMe1" maxlength="80" placeholder="Salir" />
+        <select name="askMe1">
+          <option value="">Selecciona</option>
+          <option>Salir</option>
+          <option>Mi fin de semana</option>
+          <option>Yo + mi cafe</option>
+          <option>Mi viaje ideal</option>
+        </select>
       </label>
       <label>
         Preguntame sobre #2
-        <input name="askMe2" maxlength="80" placeholder="Mi fin de semana" />
+        <select name="askMe2">
+          <option value="">Selecciona</option>
+          <option>Mis hobbies</option>
+          <option>Series favoritas</option>
+          <option>Deportes</option>
+          <option>Cocinar</option>
+        </select>
       </label>
       <label>
         Preguntame sobre #3
-        <input name="askMe3" maxlength="80" placeholder="Yo + mi cafe" />
+        <select name="askMe3">
+          <option value="">Selecciona</option>
+          <option>Planes para hoy</option>
+          <option>Musica</option>
+          <option>Mascotas</option>
+          <option>Proyectos</option>
+        </select>
       </label>
-      <label>
-        Puesto
-        <input name="jobTitle" maxlength="60" placeholder="Ingeniero de software" />
+
+      <label class="inline-toggle">
+        Tengo trabajo actualmente
+        <input id="employedInput" name="employed" type="checkbox" />
       </label>
-      <label>
-        Compania
-        <input name="company" maxlength="60" placeholder="Mi empresa" />
-      </label>
+      <div id="workWrap" hidden>
+        <label>
+          Puesto
+          <input name="jobTitle" maxlength="60" placeholder="Puesto actual" />
+        </label>
+        <label>
+          Compania
+          <input name="company" maxlength="60" placeholder="Empresa" />
+        </label>
+      </div>
+
       <label>
         Centro de estudios
-        <input name="school" maxlength="80" placeholder="Universidad..." />
+        <input name="school" maxlength="80" placeholder="Donde estudiaste" />
       </label>
+
+      <details class="fold-select">
+        <summary>Vivo en (OpenStreetMap)</summary>
+        <div class="osm-wrap">
+          <input id="osmQuery" type="search" placeholder="Buscar ciudad o direccion" />
+          <button id="btnSearchOsm" type="button">Buscar</button>
+          <div id="osmResults" class="osm-results"></div>
+        </div>
+      </details>
+      <input id="livingInInput" name="livingIn" type="hidden" />
+
       <label>
-        Vive en
-        <input name="livingIn" maxlength="40" placeholder="Ciudad actual" />
+        Artistas favoritos (separa por coma)
+        <input name="spotifyArtists" placeholder="Artista 1, Artista 2" />
       </label>
-      <label>
-        Mi cancion
-        <input name="anthem" maxlength="100" placeholder="Artista - Cancion" />
-      </label>
-      <label>
-        Artistas favoritos (Spotify, separados por coma)
-        <input name="spotifyArtists" placeholder="Artist1, Artist2, Artist3" />
-      </label>
+
       <label class="inline-toggle">
         Smart Photos
         <input name="smartPhotosEnabled" type="checkbox" checked />
@@ -282,6 +446,7 @@
         Mostrar distancia en perfil
         <input name="showDistance" type="checkbox" checked />
       </label>
+
       <button type="submit" class="form-primary">Entrar</button>
     </form>
   </dialog>

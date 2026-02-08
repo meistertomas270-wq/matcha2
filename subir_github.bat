@@ -12,8 +12,10 @@ if errorlevel 1 (
   exit /b 1
 )
 
+set DEFAULT_REPO_URL=https://github.com/meistertomas270-wq/matcha2
+
 if "%~1"=="" (
-  set /p REPO_URL=Pegue la URL de su repo GitHub: 
+  set REPO_URL=!DEFAULT_REPO_URL!
 ) else (
   set REPO_URL=%~1
 )

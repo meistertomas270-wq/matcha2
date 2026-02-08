@@ -779,6 +779,80 @@ body {
   color: #c2cee9;
 }
 
+.onb-group p {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #c2cee9;
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-btn {
+  border: 1px solid rgba(165, 184, 219, 0.3);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #101a2d;
+  color: #d4def7;
+  font-size: 11px;
+}
+
+.chip-btn.active {
+  border-color: #ff5f91;
+  background: rgba(255, 47, 115, 0.2);
+  color: #fff;
+}
+
+.fold-select {
+  border: 1px solid rgba(165, 184, 219, 0.18);
+  border-radius: 10px;
+  background: #0f1a2e;
+  padding: 8px;
+}
+
+.fold-select summary {
+  cursor: pointer;
+  color: #d4def7;
+  font-size: 12px;
+}
+
+.fold-select select {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid rgba(165, 184, 219, 0.26);
+  border-radius: 9px;
+  background: #0f1a2e;
+  color: #fff;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.osm-wrap {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.osm-wrap button,
+.osm-item {
+  border: 1px solid rgba(165, 184, 219, 0.3);
+  border-radius: 9px;
+  background: #13203a;
+  color: #fff;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.osm-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .modal-form .inline-toggle {
   flex-direction: row;
   align-items: center;
@@ -929,5 +1003,310 @@ body {
     min-height: calc(100dvh - 32px);
     box-shadow: var(--shadow-1);
     border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Feel overhaul */
+:root {
+  --bg-page: radial-gradient(circle at 8% -12%, #1c3f4f 0%, #0c1c2c 45%, #07121b 100%);
+  --surface: #0f2233;
+  --surface-soft: #12283b;
+  --surface-card: #153147;
+  --line: rgba(182, 208, 226, 0.26);
+  --text: #f3fbff;
+  --text-soft: #a9bfd0;
+  --accent-pink: #ff5a7b;
+  --accent-red: #ff6f61;
+  --accent-blue: #45b4ff;
+  --accent-green: #68e39b;
+  --accent-gold: #ffba49;
+  --shadow-1: 0 22px 52px rgba(4, 13, 21, 0.58);
+}
+
+html,
+body {
+  font-family: "Avenir Next", "Segoe UI Variable", "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+body {
+  background-attachment: fixed;
+}
+
+.app-shell {
+  position: relative;
+}
+
+.app-shell::before,
+.app-shell::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(70px);
+  opacity: 0.26;
+}
+
+.app-shell::before {
+  width: 260px;
+  height: 260px;
+  left: -70px;
+  top: -70px;
+  background: #58d2ff;
+}
+
+.app-shell::after {
+  width: 280px;
+  height: 280px;
+  right: -70px;
+  bottom: 140px;
+  background: #ff8d6b;
+}
+
+.phone {
+  position: relative;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 10% -15%, rgba(100, 203, 255, 0.2), transparent 48%),
+    radial-gradient(circle at 90% 10%, rgba(255, 130, 101, 0.16), transparent 40%),
+    linear-gradient(180deg, #0d1f2f 0%, #0a1825 100%);
+}
+
+.screen-header {
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(190, 219, 236, 0.14);
+}
+
+.screen-title {
+  letter-spacing: 0.2px;
+  font-weight: 800;
+}
+
+.icon-btn,
+.settings-btn,
+.filter-pill,
+.likes-tab,
+.nav-btn,
+.round-action,
+.match-chip,
+.chip-btn,
+.form-primary,
+.chat-composer button {
+  transition: transform 0.18s ease, box-shadow 0.22s ease, border-color 0.22s ease,
+    background-color 0.22s ease, color 0.22s ease;
+}
+
+.icon-btn:hover,
+.settings-btn:hover,
+.filter-pill:hover,
+.form-primary:hover,
+.chat-composer button:hover {
+  transform: translateY(-1px);
+}
+
+.icon-btn:active,
+.settings-btn:active,
+.round-action:active,
+.nav-btn:active,
+.form-primary:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.filter-pill.active {
+  background: linear-gradient(180deg, rgba(87, 188, 244, 0.32), rgba(56, 123, 166, 0.25));
+  border-color: rgba(174, 229, 255, 0.42);
+}
+
+.card {
+  border: 1px solid rgba(184, 220, 239, 0.16);
+  box-shadow: 0 24px 60px rgba(2, 12, 20, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.card::after {
+  background: linear-gradient(
+    to top,
+    rgba(4, 9, 14, 0.9) 14%,
+    rgba(4, 9, 14, 0.3) 54%,
+    rgba(4, 9, 14, 0.03) 81%
+  );
+}
+
+.card-title {
+  text-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.card-tag {
+  background: rgba(8, 18, 29, 0.62);
+  border-color: rgba(195, 225, 240, 0.4);
+}
+
+.swipe-actions {
+  margin-top: 2px;
+}
+
+.round-action {
+  background: linear-gradient(180deg, #16344d, #11263a);
+  border: 1px solid rgba(184, 221, 240, 0.24);
+}
+
+.round-action.like {
+  box-shadow: 0 10px 24px rgba(85, 231, 150, 0.18);
+}
+
+.round-action.danger {
+  box-shadow: 0 10px 24px rgba(255, 120, 120, 0.16);
+}
+
+.hero-card,
+.profile-card,
+.premium-card,
+.chat-item,
+.stat-card,
+.explore-card,
+.like-card {
+  border-color: rgba(192, 223, 239, 0.14);
+  box-shadow: 0 12px 30px rgba(3, 10, 16, 0.34);
+}
+
+.hero-card,
+.profile-card {
+  animation: card-float 7s ease-in-out infinite;
+}
+
+.hero-overlay h2,
+.profile-name,
+.premium-card h3 {
+  letter-spacing: 0.2px;
+}
+
+.likes-tab.active {
+  border-bottom-color: #ff7b69;
+  color: #ffd9cb;
+}
+
+.cta-gold {
+  background: linear-gradient(180deg, #ffc968, #f0a434);
+  box-shadow: 0 10px 24px rgba(255, 173, 65, 0.3);
+}
+
+.chat-item {
+  background: linear-gradient(180deg, rgba(20, 42, 61, 0.84), rgba(14, 32, 47, 0.84));
+}
+
+.chat-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(174, 223, 255, 0.34);
+}
+
+.profile-card {
+  background: linear-gradient(180deg, rgba(22, 53, 78, 0.95), rgba(16, 39, 59, 0.95));
+}
+
+.profile-fact {
+  background: rgba(90, 143, 174, 0.18);
+  border: 1px solid rgba(171, 215, 241, 0.2);
+}
+
+.bottom-nav {
+  backdrop-filter: blur(16px);
+  border-top-color: rgba(188, 222, 241, 0.14);
+}
+
+.nav-btn.active {
+  background: linear-gradient(180deg, rgba(99, 193, 245, 0.3), rgba(58, 117, 157, 0.26));
+  color: #eaffff;
+}
+
+.modal,
+.chat-modal {
+  background: linear-gradient(180deg, #0f2336, #0b1a2a);
+  border: 1px solid rgba(188, 222, 240, 0.2);
+  box-shadow: 0 30px 70px rgba(1, 6, 10, 0.62);
+}
+
+.modal-form {
+  gap: 12px;
+}
+
+.modal-form input,
+.modal-form textarea,
+.modal-form select,
+.chat-composer input,
+.chat-search-wrap input {
+  border-color: rgba(175, 210, 230, 0.32);
+  background: linear-gradient(180deg, #12293d, #0f2336);
+}
+
+.modal-form input:focus,
+.modal-form textarea:focus,
+.modal-form select:focus,
+.chat-composer input:focus,
+.chat-search-wrap input:focus {
+  outline: none;
+  border-color: rgba(132, 213, 255, 0.64);
+  box-shadow: 0 0 0 3px rgba(94, 194, 252, 0.16);
+}
+
+.chip-btn.active {
+  border-color: #ff9f84;
+  background: linear-gradient(180deg, rgba(255, 140, 110, 0.3), rgba(209, 93, 66, 0.24));
+}
+
+.fold-select {
+  border-color: rgba(183, 216, 235, 0.24);
+  background: linear-gradient(180deg, #12293d, #0f2336);
+}
+
+.fold-select[open] {
+  border-color: rgba(128, 204, 242, 0.48);
+}
+
+.osm-wrap button,
+.osm-item {
+  background: linear-gradient(180deg, #17334a, #132a3f);
+}
+
+.bubble.me {
+  background: linear-gradient(180deg, #2a8dde, #206fb2);
+}
+
+.bubble.them {
+  background: linear-gradient(180deg, #1f3d58, #18344e);
+}
+
+.toast {
+  background: rgba(10, 27, 40, 0.93);
+  border-color: rgba(177, 215, 235, 0.35);
+}
+
+.tab-view.active > * {
+  animation: fade-stagger 0.35s ease both;
+}
+
+@keyframes card-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes fade-stagger {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-card,
+  .profile-card,
+  .tab-view.active > * {
+    animation: none;
   }
 }

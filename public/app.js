@@ -55,9 +55,32 @@ const btnNotif = document.getElementById("btnNotif");
 const btnReset = document.getElementById("btnReset");
 const btnNotifProfile = document.getElementById("btnNotifProfile");
 const btnResetProfile = document.getElementById("btnResetProfile");
+const btnLogoutProfile = document.getElementById("btnLogoutProfile");
 
 const onboardingDialog = document.getElementById("onboardingDialog");
 const onboardingForm = document.getElementById("onboardingForm");
+const dobInput = document.getElementById("dobInput");
+const ageInput = document.getElementById("ageInput");
+const zodiacInput = document.getElementById("zodiacInput");
+const showZodiacInput = document.getElementById("showZodiacInput");
+const zodiacHint = document.getElementById("zodiacHint");
+const photoFilesInput = document.getElementById("photoFilesInput");
+const photoUrlsInput = document.getElementById("photoUrlsInput");
+const photoCountHint = document.getElementById("photoCountHint");
+const interestsPicker = document.getElementById("interestsPicker");
+const interestsInput = document.getElementById("interestsInput");
+const relationshipPicker = document.getElementById("relationshipPicker");
+const relationshipGoalInput = document.getElementById("relationshipGoalInput");
+const languagesPicker = document.getElementById("languagesPicker");
+const languagesInput = document.getElementById("languagesInput");
+const politicsInput = document.getElementById("politicsInput");
+const pronounsWrap = document.getElementById("pronounsWrap");
+const employedInput = document.getElementById("employedInput");
+const workWrap = document.getElementById("workWrap");
+const btnSearchOsm = document.getElementById("btnSearchOsm");
+const osmQuery = document.getElementById("osmQuery");
+const osmResults = document.getElementById("osmResults");
+const livingInInput = document.getElementById("livingInInput");
 
 const chatDialog = document.getElementById("chatDialog");
 const chatDialogTitleEl = document.getElementById("chatDialogTitle");
@@ -163,6 +186,10 @@ async function bootstrap() {
 
 function bindEvents() {
   onboardingForm.addEventListener("submit", onCreateProfile);
+  bindChipPicker(interestsPicker, interestsInput, Number(interestsPicker?.dataset.max || 6));
+  bindChipPicker(languagesPicker, languagesInput, Number(languagesPicker?.dataset.max || 4));
+  bindChipPicker(relationshipPicker, relationshipGoalInput, 1);
+  bindFoldSelects();
 
   navButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -207,29 +234,55 @@ function bindEvents() {
 
   btnReset.addEventListener("click", hardResetProfile);
   btnResetProfile.addEventListener("click", hardResetProfile);
+  btnLogoutProfile?.addEventListener("click", hardResetProfile);
 
   btnCloseChat.addEventListener("click", closeChatDialog);
   chatComposer.addEventListener("submit", onSendChatMessage);
+
+  dobInput?.addEventListener("change", syncBirthData);
+  photoFilesInput?.addEventListener("change", onPhotosChanged);
+  politicsInput?.addEventListener("change", syncPoliticsPronouns);
+  employedInput?.addEventListener("change", syncWorkFields);
+  btnSearchOsm?.addEventListener("click", searchOsmLocation);
+  showZodiacInput?.addEventListener("change", syncBirthData);
+
+  syncPoliticsPronouns();
+  syncWorkFields();
 }
 
 async function onCreateProfile(event) {
   event.preventDefault();
+  syncBirthData();
+  const photoUrls = await readPhotoFiles(photoFilesInput?.files);
+  if (!photoUrls.length) {
+    showToast("Sube al menos 1 foto");
+    return;
+  }
+  if (photoUrls.length > 5) {
+    showToast("Maximo 5 fotos");
+    return;
+  }
+  photoUrlsInput.value = `${photoUrls.length} fotos`;
 
   const formData = new FormData(onboardingForm);
   const payload = {
     name: String(formData.get("name") || ""),
     age: Number(formData.get("age")) || 25,
-    city: String(formData.get("city") || ""),
+    dob: String(formData.get("dob") || ""),
+    city: String(formData.get("livingIn") || ""),
     bio: String(formData.get("bio") || ""),
-    photoUrl: String(formData.get("photoUrl") || ""),
+    photoUrls,
+    photoUrl: String(photoUrls[0] || ""),
     interests: parseCsvField(formData.get("interests")),
     relationshipGoal: String(formData.get("relationshipGoal") || ""),
+    politics: String(formData.get("politics") || "derecha"),
     gender: String(formData.get("gender") || ""),
     sexualOrientation: String(formData.get("sexualOrientation") || ""),
     pronouns: String(formData.get("pronouns") || ""),
     heightCm: Number(formData.get("heightCm")) || null,
     languages: parseCsvField(formData.get("languages")),
     zodiacSign: String(formData.get("zodiacSign") || ""),
+    showZodiac: isChecked("showZodiac"),
     education: String(formData.get("education") || ""),
     familyPlans: String(formData.get("familyPlans") || ""),
     loveStyle: String(formData.get("loveStyle") || ""),
@@ -244,15 +297,17 @@ async function onCreateProfile(event) {
     askMe2: String(formData.get("askMe2") || ""),
     askMe3: String(formData.get("askMe3") || ""),
     jobTitle: String(formData.get("jobTitle") || ""),
-    company: String(formData.get("company") || ""),
+    company: isChecked("employed") ? String(formData.get("company") || "") : "",
     school: String(formData.get("school") || ""),
     livingIn: String(formData.get("livingIn") || ""),
-    anthem: String(formData.get("anthem") || ""),
     spotifyArtists: parseCsvField(formData.get("spotifyArtists")),
     smartPhotosEnabled: isChecked("smartPhotosEnabled"),
     showAge: isChecked("showAge"),
     showDistance: isChecked("showDistance"),
   };
+  if (payload.politics !== "izquierda") {
+    payload.pronouns = "";
+  }
 
   const created = await postJson("/api/auth/guest", payload).catch(() => null);
   if (!created?.ok || !created.user) {
@@ -412,7 +467,7 @@ function createSwipeCard(profile, isTop, index) {
   const card = document.createElement("article");
   card.className = "card";
   card.dataset.userId = profile.id;
-  card.style.backgroundImage = `url("${escapeHtml(profile.photoUrl)}")`;
+  card.style.backgroundImage = `url("${escapeHtml(getPrimaryPhoto(profile))}")`;
   card.style.transform = `scale(${1 - index * 0.035}) translateY(${index * 8}px)`;
   card.style.zIndex = String(20 - index);
 
@@ -558,7 +613,7 @@ function renderLikes() {
     const card = document.createElement("article");
     card.className = `like-card ${isLikesMode ? "blur" : ""}`;
     card.innerHTML = `
-      <img src="${escapeHtml(profile.photoUrl || "")}" alt="${escapeHtml(profile.name || "")}" loading="lazy" />
+      <img src="${escapeHtml(getPrimaryPhoto(profile))}" alt="${escapeHtml(profile.name || "")}" loading="lazy" />
       <div class="like-meta">
         <h5>${escapeHtml(profile.name || "Perfil")}, ${Number(profile.age) || 0}</h5>
         <p>${escapeHtml(profile.city || "Sin ciudad")}</p>
@@ -585,7 +640,7 @@ function renderNewMatchesRail() {
     chip.className = "match-chip";
     chip.type = "button";
     chip.innerHTML = `
-      <img src="${escapeHtml(match.user.photoUrl || "")}" alt="${escapeHtml(match.user.name || "")}" />
+      <img src="${escapeHtml(getPrimaryPhoto(match.user))}" alt="${escapeHtml(match.user.name || "")}" />
       <span>${escapeHtml(match.user.name || "")}</span>
     `;
     chip.addEventListener("click", () => {
@@ -619,7 +674,7 @@ function renderChatList() {
     const item = document.createElement("article");
     item.className = "chat-item";
     item.innerHTML = `
-      <img src="${escapeHtml(chat.user.photoUrl || "")}" alt="${escapeHtml(chat.user.name || "")}" />
+      <img src="${escapeHtml(getPrimaryPhoto(chat.user))}" alt="${escapeHtml(chat.user.name || "")}" />
       <div class="chat-main">
         <h4>${escapeHtml(chat.user.name || "Chat")}${chat.user.isOnline ? "  - activo" : ""}</h4>
         <p>${escapeHtml(chat.lastMessage || "")}</p>
@@ -718,8 +773,9 @@ function markChatAsRead(chatId) {
 
 function renderProfile() {
   if (!state.user) return;
-  profileAvatarEl.src = state.user.photoUrl || buildFallbackPhoto(state.user.id);
-  profileNameEl.textContent = `${state.user.name}, ${Number(state.user.age) || 0}`;
+  profileAvatarEl.src = getPrimaryPhoto(state.user);
+  const safeAge = Number(state.user.age) || 0;
+  profileNameEl.textContent = state.user.showAge ? `${state.user.name}, ${safeAge}` : state.user.name;
   profileBioEl.textContent = `${state.user.bio || "Sin bio"} - ${state.user.city || "Sin ciudad"}`;
   profileExtraEl.innerHTML = buildProfileFacts(state.user);
 
@@ -808,6 +864,12 @@ function maybeBrowserNotify(title, body) {
 }
 
 function openOnboarding() {
+  if (dobInput && !dobInput.value) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 25);
+    dobInput.value = d.toISOString().slice(0, 10);
+    syncBirthData();
+  }
   openDialog(onboardingDialog);
 }
 
@@ -842,22 +904,29 @@ function buildProfileFacts(user) {
   const items = [];
   pushProfileFact(items, "Meta", user.relationshipGoal);
   pushProfileFact(items, "Intereses", Array.isArray(user.interests) ? user.interests.join(", ") : "");
+  pushProfileFact(items, "Politica", user.politics);
   pushProfileFact(items, "Sexo", user.gender);
   pushProfileFact(items, "Orientacion", user.sexualOrientation);
   pushProfileFact(items, "Pronombres", user.pronouns);
   pushProfileFact(items, "Altura", user.heightCm ? `${user.heightCm} cm` : "");
   pushProfileFact(items, "Idiomas", Array.isArray(user.languages) ? user.languages.join(", ") : "");
+  if (user.showZodiac) {
+    pushProfileFact(items, "Signo", user.zodiacSign);
+  }
   pushProfileFact(items, "Educacion", user.education);
   pushProfileFact(items, "Familia", user.familyPlans);
+  pushProfileFact(items, "Amor", user.loveStyle);
   pushProfileFact(items, "Mascotas", user.pets);
   pushProfileFact(items, "Beber", user.drinking);
   pushProfileFact(items, "Fumar", user.smoking);
   pushProfileFact(items, "Ejercicio", user.workout);
+  pushProfileFact(items, "Redes", user.socialMedia);
+  pushProfileFact(items, "Prompt", user.aboutPromptQuestion && user.aboutPromptAnswer ? `${user.aboutPromptQuestion} ${user.aboutPromptAnswer}` : "");
+  pushProfileFact(items, "Preguntame", [user.askMe1, user.askMe2, user.askMe3].filter(Boolean).join(", "));
   pushProfileFact(items, "Puesto", user.jobTitle);
   pushProfileFact(items, "Compania", user.company);
   pushProfileFact(items, "Estudios", user.school);
   pushProfileFact(items, "Vive en", user.livingIn);
-  pushProfileFact(items, "Cancion", user.anthem);
   pushProfileFact(
     items,
     "Spotify",
@@ -882,6 +951,177 @@ function buildInterests(seed) {
   return [first, second, third];
 }
 
+function bindChipPicker(container, hiddenInput, maxSelection) {
+  if (!container || !hiddenInput) return;
+  container.addEventListener("click", (event) => {
+    const button = event.target.closest(".chip-btn");
+    if (!button) return;
+    const isSingle = maxSelection === 1 || container.classList.contains("single");
+    if (isSingle) {
+      container.querySelectorAll(".chip-btn.active").forEach((el) => el.classList.remove("active"));
+      button.classList.add("active");
+    } else {
+      const already = button.classList.contains("active");
+      if (!already) {
+        const selected = container.querySelectorAll(".chip-btn.active").length;
+        if (selected >= maxSelection) {
+          showToast(`Maximo ${maxSelection} seleccionados`);
+          return;
+        }
+      }
+      button.classList.toggle("active");
+    }
+    const values = Array.from(container.querySelectorAll(".chip-btn.active")).map((el) =>
+      String(el.dataset.value || "").trim()
+    );
+    hiddenInput.value = values.join(",");
+  });
+}
+
+function bindFoldSelects() {
+  document.querySelectorAll(".fold-select select").forEach((select) => {
+    select.addEventListener("change", () => {
+      const details = select.closest("details");
+      if (details) details.open = false;
+    });
+  });
+}
+
+async function onPhotosChanged() {
+  const files = photoFilesInput?.files;
+  const count = files?.length || 0;
+  photoCountHint.textContent = `${Math.min(count, 5)}/5 seleccionadas`;
+  if (count > 5) {
+    showToast("Maximo 5 fotos");
+  }
+}
+
+function syncPoliticsPronouns() {
+  const isLeft = politicsInput?.value === "izquierda";
+  pronounsWrap.hidden = !isLeft;
+  if (!isLeft) {
+    const field = onboardingForm.elements.namedItem("pronouns");
+    if (field) field.value = "";
+  }
+}
+
+function syncWorkFields() {
+  workWrap.hidden = !employedInput?.checked;
+  if (!employedInput?.checked) {
+    const job = onboardingForm.elements.namedItem("jobTitle");
+    const company = onboardingForm.elements.namedItem("company");
+    if (job) job.value = "";
+    if (company) company.value = "";
+  }
+}
+
+function syncBirthData() {
+  const dob = String(dobInput?.value || "");
+  const info = calculateAgeAndZodiac(dob);
+  ageInput.value = info.age ? String(info.age) : "";
+  zodiacInput.value = info.zodiacSign;
+  zodiacHint.textContent = `Signo calculado: ${info.zodiacSign || "-"}`;
+}
+
+function calculateAgeAndZodiac(dobIso) {
+  if (!dobIso) return { age: null, zodiacSign: "" };
+  const dob = new Date(`${dobIso}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return { age: null, zodiacSign: "" };
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDelta = now.getMonth() - dob.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  const month = dob.getMonth() + 1;
+  const day = dob.getDate();
+  return { age: Math.max(18, age), zodiacSign: zodiacFromDate(day, month) };
+}
+
+function zodiacFromDate(day, month) {
+  if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return "Aries";
+  if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return "Tauro";
+  if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return "Geminis";
+  if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return "Cancer";
+  if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return "Leo";
+  if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return "Virgo";
+  if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return "Libra";
+  if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return "Escorpio";
+  if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return "Sagitario";
+  if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return "Capricornio";
+  if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return "Acuario";
+  return "Piscis";
+}
+
+async function readPhotoFiles(fileList) {
+  const files = Array.from(fileList || []).slice(0, 5);
+  const urls = [];
+  for (const file of files) {
+    if ((file.size || 0) > 3 * 1024 * 1024) {
+      showToast(`Foto ${file.name} supera 3MB`);
+      continue;
+    }
+    const data = await fileToDataUrl(file);
+    if (data) urls.push(data);
+  }
+  return urls;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve("");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
+async function searchOsmLocation() {
+  const q = String(osmQuery?.value || "").trim();
+  if (!q) return;
+  osmResults.innerHTML = "Buscando...";
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(
+      q
+    )}`;
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const list = await response.json();
+    renderOsmResults(Array.isArray(list) ? list : []);
+  } catch {
+    osmResults.innerHTML = "No se pudo buscar ubicacion";
+  }
+}
+
+function renderOsmResults(results) {
+  if (!results.length) {
+    osmResults.innerHTML = "Sin resultados";
+    return;
+  }
+  osmResults.innerHTML = "";
+  results.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "osm-item";
+    button.textContent = item.display_name || "Ubicacion";
+    button.addEventListener("click", () => {
+      livingInInput.value = String(item.display_name || "");
+      osmQuery.value = String(item.display_name || "");
+      osmResults.innerHTML = "Ubicacion seleccionada";
+      const details = osmResults.closest("details");
+      if (details) details.open = false;
+    });
+    osmResults.appendChild(button);
+  });
+}
+
 function parseCsvField(raw) {
   return String(raw || "")
     .split(",")
@@ -892,6 +1132,13 @@ function parseCsvField(raw) {
 function isChecked(name) {
   const field = onboardingForm.elements.namedItem(name);
   return Boolean(field && field.checked);
+}
+
+function getPrimaryPhoto(profile) {
+  if (Array.isArray(profile?.photoUrls) && profile.photoUrls.length) {
+    return profile.photoUrls[0];
+  }
+  return profile?.photoUrl || buildFallbackPhoto(profile?.id || "fallback");
 }
 
 function buildFallbackPhoto(seed) {

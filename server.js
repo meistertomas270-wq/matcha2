@@ -99,7 +99,7 @@ let firebaseMessaging = null;
 initFirebase();
 
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/health", async (_req, res) => {
@@ -120,7 +120,7 @@ app.get("/health", async (_req, res) => {
 app.post("/api/auth/guest", async (req, res) => {
   try {
     const payload = req.body || {};
-    const { name, age, photoUrl } = payload;
+    const { name } = payload;
     if (!name || !String(name).trim()) {
       return res.status(400).json({ ok: false, error: "name_required" });
     }
@@ -132,24 +132,28 @@ app.post("/api/auth/guest", async (req, res) => {
     }
 
     const userId = `u_${uuidv4()}`;
-    const safeAge = Number(age) || 25;
+    const resolvedAge = resolveAge(payload.age, profile.dob);
     const values = [
       userId,
       String(name).trim().slice(0, 30),
-      Math.max(18, Math.min(99, safeAge)),
+      resolvedAge,
       profile.city,
       profile.bio,
-      String(photoUrl || "").trim() ||
+      profile.photoUrls[0] ||
         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
+      profile.photoUrls,
       profile.smartPhotosEnabled,
       profile.aboutPromptQuestion,
       profile.aboutPromptAnswer,
       profile.interests,
       profile.relationshipGoal,
+      profile.politics,
       profile.pronouns,
       profile.heightCm,
       profile.languages,
       profile.zodiacSign,
+      profile.showZodiac,
+      profile.dob,
       profile.education,
       profile.familyPlans,
       profile.loveStyle,
@@ -176,18 +180,18 @@ app.post("/api/auth/guest", async (req, res) => {
     const { rows } = await pool.query(
       `
       INSERT INTO users (
-        id, name, age, city, bio, photo_url, smart_photos_enabled, about_prompt_question,
-        about_prompt_answer, interests, relationship_goal, pronouns, height_cm, languages,
-        zodiac_sign, education, family_plans, love_style, pets, drinking, smoking, workout,
+        id, name, age, city, bio, photo_url, photo_urls, smart_photos_enabled, about_prompt_question,
+        about_prompt_answer, interests, relationship_goal, politics, pronouns, height_cm, languages,
+        zodiac_sign, show_zodiac, dob, education, family_plans, love_style, pets, drinking, smoking, workout,
         social_media, ask_me_1, ask_me_2, ask_me_3, job_title, company, school, living_in,
         anthem, spotify_artists, gender, sexual_orientation, show_age, show_distance, created_at
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22,
-        $23, $24, $25, $26, $27, $28, $29, $30,
-        $31, $32, $33, $34, $35, $36, NOW()
+        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10, $11, $12, $13, $14, $15, $16,
+        $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+        $27, $28, $29, $30, $31, $32, $33, $34,
+        $35, $36, $37, $38, $39, $40, NOW()
       )
       RETURNING ${buildUserSelect("")}
       `,
@@ -739,15 +743,19 @@ async function initDb() {
         city TEXT NOT NULL,
         bio TEXT NOT NULL,
         photo_url TEXT NOT NULL,
+        photo_urls TEXT[] NOT NULL DEFAULT '{}',
         smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
         about_prompt_question TEXT,
         about_prompt_answer TEXT,
         interests TEXT[] NOT NULL DEFAULT '{}',
         relationship_goal TEXT,
+        politics TEXT,
         pronouns TEXT,
         height_cm INT,
         languages TEXT[] NOT NULL DEFAULT '{}',
         zodiac_sign TEXT,
+        show_zodiac BOOLEAN NOT NULL DEFAULT TRUE,
+        dob DATE,
         education TEXT,
         family_plans TEXT,
         love_style TEXT,
@@ -775,15 +783,19 @@ async function initDb() {
 
     await client.query(`
       ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS photo_urls TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS about_prompt_question TEXT,
       ADD COLUMN IF NOT EXISTS about_prompt_answer TEXT,
       ADD COLUMN IF NOT EXISTS interests TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS relationship_goal TEXT,
+      ADD COLUMN IF NOT EXISTS politics TEXT,
       ADD COLUMN IF NOT EXISTS pronouns TEXT,
       ADD COLUMN IF NOT EXISTS height_cm INT,
       ADD COLUMN IF NOT EXISTS languages TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS zodiac_sign TEXT,
+      ADD COLUMN IF NOT EXISTS show_zodiac BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS dob DATE,
       ADD COLUMN IF NOT EXISTS education TEXT,
       ADD COLUMN IF NOT EXISTS family_plans TEXT,
       ADD COLUMN IF NOT EXISTS love_style TEXT,
@@ -805,6 +817,13 @@ async function initDb() {
       ADD COLUMN IF NOT EXISTS sexual_orientation TEXT,
       ADD COLUMN IF NOT EXISTS show_age BOOLEAN NOT NULL DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS show_distance BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
+    await client.query(`
+      UPDATE users
+      SET photo_urls = ARRAY[photo_url]
+      WHERE (photo_urls IS NULL OR array_length(photo_urls, 1) IS NULL)
+        AND photo_url IS NOT NULL
     `);
 
     await client.query(`
@@ -871,10 +890,10 @@ async function initDb() {
       for (const u of defaultUsers) {
         await client.query(
           `
-          INSERT INTO users (id, name, age, city, bio, photo_url, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          INSERT INTO users (id, name, age, city, bio, photo_url, photo_urls, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
           `,
-          [u.id, u.name, u.age, u.city, u.bio, u.photoUrl]
+          [u.id, u.name, u.age, u.city, u.bio, u.photoUrl, [u.photoUrl]]
         );
       }
     }
@@ -1077,15 +1096,19 @@ function buildUserSelect(alias = "") {
     ${p}city,
     ${p}bio,
     ${p}photo_url AS "photoUrl",
+    ${p}photo_urls AS "photoUrls",
     ${p}smart_photos_enabled AS "smartPhotosEnabled",
     ${p}about_prompt_question AS "aboutPromptQuestion",
     ${p}about_prompt_answer AS "aboutPromptAnswer",
     ${p}interests,
     ${p}relationship_goal AS "relationshipGoal",
+    ${p}politics,
     ${p}pronouns,
     ${p}height_cm AS "heightCm",
     ${p}languages,
     ${p}zodiac_sign AS "zodiacSign",
+    ${p}show_zodiac AS "showZodiac",
+    ${p}dob,
     ${p}education,
     ${p}family_plans AS "familyPlans",
     ${p}love_style AS "loveStyle",
@@ -1112,19 +1135,28 @@ function buildUserSelect(alias = "") {
 }
 
 function normalizeExtendedProfile(raw) {
-  const city = normalizeText(raw.city, 40) || "Sin ciudad";
+  const city = normalizeText(raw.city || raw.livingIn, 80) || "Sin ciudad";
+  const photoUrls = normalizePhotoList(raw.photoUrls, 5);
+  const dob = normalizeDateOnly(raw.dob);
+  const politics = normalizeEnum(raw.politics, ["derecha", "izquierda"], "derecha");
+  const zodiacFromDob = dob ? zodiacSignFromDate(dob) : "";
+  const zodiacSign = zodiacFromDob || normalizeText(raw.zodiacSign, 20);
   return {
     city,
     bio: normalizeText(raw.bio, 180),
+    photoUrls,
     smartPhotosEnabled: normalizeBoolean(raw.smartPhotosEnabled, true),
     aboutPromptQuestion: normalizeText(raw.aboutPromptQuestion, 80),
     aboutPromptAnswer: normalizeText(raw.aboutPromptAnswer, 140),
-    interests: normalizeList(raw.interests, 12, 24),
+    interests: normalizeList(raw.interests, 6, 24),
     relationshipGoal: normalizeText(raw.relationshipGoal, 40),
-    pronouns: normalizeText(raw.pronouns, 30),
+    politics,
+    pronouns: politics === "izquierda" ? normalizeText(raw.pronouns, 30) : "",
     heightCm: normalizeInt(raw.heightCm, 120, 230),
     languages: normalizeList(raw.languages, 8, 24),
-    zodiacSign: normalizeText(raw.zodiacSign, 20),
+    zodiacSign,
+    showZodiac: normalizeBoolean(raw.showZodiac, true),
+    dob,
     education: normalizeText(raw.education, 50),
     familyPlans: normalizeText(raw.familyPlans, 60),
     loveStyle: normalizeText(raw.loveStyle, 40),
@@ -1140,7 +1172,7 @@ function normalizeExtendedProfile(raw) {
     company: normalizeText(raw.company, 60),
     school: normalizeText(raw.school, 80),
     livingIn: normalizeText(raw.livingIn, 40) || city,
-    anthem: normalizeText(raw.anthem, 100),
+    anthem: "",
     spotifyArtists: normalizeList(raw.spotifyArtists, 10, 40),
     gender: normalizeText(raw.gender, 30),
     sexualOrientation: normalizeText(raw.sexualOrientation, 40),
@@ -1151,9 +1183,11 @@ function normalizeExtendedProfile(raw) {
 
 function validateRequiredProfile(profile) {
   if (!profile.bio) return "bio_required";
-  if (profile.interests.length < 3) return "interests_min_3";
+  if (!profile.photoUrls.length) return "photo_required";
+  if (profile.interests.length < 1) return "interests_min_1";
   if (!profile.relationshipGoal) return "relationship_goal_required";
   if (!profile.gender) return "gender_required";
+  if (!profile.livingIn) return "living_in_required";
   return "";
 }
 
@@ -1167,6 +1201,27 @@ function normalizeList(value, maxItems, maxItemLen) {
     .map((item) => normalizeText(item, maxItemLen))
     .filter(Boolean)
     .slice(0, maxItems);
+}
+
+function normalizePhotoList(value, maxItems) {
+  const source = Array.isArray(value) ? value : [];
+  return source
+    .map((item) => String(item || "").trim())
+    .filter((item) => item.startsWith("data:image/"))
+    .slice(0, maxItems);
+}
+
+function normalizeDateOnly(value) {
+  const raw = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
+  return raw;
+}
+
+function normalizeEnum(value, allowed, fallback) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return allowed.includes(normalized) ? normalized : fallback;
 }
 
 function normalizeInt(value, min, max) {
@@ -1183,6 +1238,40 @@ function normalizeBoolean(value, fallback) {
     if (["false", "0", "off", "no"].includes(s)) return false;
   }
   return fallback;
+}
+
+function resolveAge(ageInput, dob) {
+  if (dob) {
+    const birth = new Date(`${dob}T00:00:00Z`);
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date();
+      let age = now.getUTCFullYear() - birth.getUTCFullYear();
+      const monthDiff = now.getUTCMonth() - birth.getUTCMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < birth.getUTCDate())) {
+        age -= 1;
+      }
+      return Math.max(18, Math.min(99, age));
+    }
+  }
+  const safeAge = Number(ageInput) || 25;
+  return Math.max(18, Math.min(99, safeAge));
+}
+
+function zodiacSignFromDate(dob) {
+  const [year, month, day] = dob.split("-").map((v) => Number(v));
+  if (!year || !month || !day) return "";
+  if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return "Aries";
+  if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return "Tauro";
+  if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return "Geminis";
+  if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return "Cancer";
+  if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return "Leo";
+  if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return "Virgo";
+  if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return "Libra";
+  if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return "Escorpio";
+  if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return "Sagitario";
+  if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return "Capricornio";
+  if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return "Acuario";
+  return "Piscis";
 }
 
 function formatMatch(row) {
