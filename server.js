@@ -119,9 +119,16 @@ app.get("/health", async (_req, res) => {
 
 app.post("/api/auth/guest", async (req, res) => {
   try {
-    const { name, age, city, bio, photoUrl } = req.body || {};
+    const payload = req.body || {};
+    const { name, age, photoUrl } = payload;
     if (!name || !String(name).trim()) {
       return res.status(400).json({ ok: false, error: "name_required" });
+    }
+
+    const profile = normalizeExtendedProfile(payload);
+    const validationError = validateRequiredProfile(profile);
+    if (validationError) {
+      return res.status(400).json({ ok: false, error: validationError });
     }
 
     const userId = `u_${uuidv4()}`;
@@ -130,17 +137,59 @@ app.post("/api/auth/guest", async (req, res) => {
       userId,
       String(name).trim().slice(0, 30),
       Math.max(18, Math.min(99, safeAge)),
-      String(city || "Sin ciudad").slice(0, 40),
-      String(bio || "Nuevo en Matcha").slice(0, 180),
+      profile.city,
+      profile.bio,
       String(photoUrl || "").trim() ||
         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
+      profile.smartPhotosEnabled,
+      profile.aboutPromptQuestion,
+      profile.aboutPromptAnswer,
+      profile.interests,
+      profile.relationshipGoal,
+      profile.pronouns,
+      profile.heightCm,
+      profile.languages,
+      profile.zodiacSign,
+      profile.education,
+      profile.familyPlans,
+      profile.loveStyle,
+      profile.pets,
+      profile.drinking,
+      profile.smoking,
+      profile.workout,
+      profile.socialMedia,
+      profile.askMe1,
+      profile.askMe2,
+      profile.askMe3,
+      profile.jobTitle,
+      profile.company,
+      profile.school,
+      profile.livingIn,
+      profile.anthem,
+      profile.spotifyArtists,
+      profile.gender,
+      profile.sexualOrientation,
+      profile.showAge,
+      profile.showDistance,
     ];
 
     const { rows } = await pool.query(
       `
-      INSERT INTO users (id, name, age, city, bio, photo_url, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      RETURNING id, name, age, city, bio, photo_url AS "photoUrl", created_at AS "createdAt"
+      INSERT INTO users (
+        id, name, age, city, bio, photo_url, smart_photos_enabled, about_prompt_question,
+        about_prompt_answer, interests, relationship_goal, pronouns, height_cm, languages,
+        zodiac_sign, education, family_plans, love_style, pets, drinking, smoking, workout,
+        social_media, ask_me_1, ask_me_2, ask_me_3, job_title, company, school, living_in,
+        anthem, spotify_artists, gender, sexual_orientation, show_age, show_distance, created_at
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        $9, $10, $11, $12, $13, $14,
+        $15, $16, $17, $18, $19, $20, $21, $22,
+        $23, $24, $25, $26, $27, $28, $29, $30,
+        $31, $32, $33, $34, $35, $36, NOW()
+      )
+      RETURNING ${buildUserSelect("")}
       `,
       values
     );
@@ -160,7 +209,7 @@ app.get("/api/users/:userId", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `
-      SELECT id, name, age, city, bio, photo_url AS "photoUrl", created_at AS "createdAt"
+      SELECT ${buildUserSelect("")}
       FROM users
       WHERE id = $1
       `,
@@ -191,7 +240,7 @@ app.get("/api/profiles/stack", async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      SELECT u.id, u.name, u.age, u.city, u.bio, u.photo_url AS "photoUrl", u.created_at AS "createdAt"
+      SELECT ${buildUserSelect("u")}
       FROM users u
       WHERE u.id <> $1
         AND NOT EXISTS (
@@ -690,8 +739,72 @@ async function initDb() {
         city TEXT NOT NULL,
         bio TEXT NOT NULL,
         photo_url TEXT NOT NULL,
+        smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        about_prompt_question TEXT,
+        about_prompt_answer TEXT,
+        interests TEXT[] NOT NULL DEFAULT '{}',
+        relationship_goal TEXT,
+        pronouns TEXT,
+        height_cm INT,
+        languages TEXT[] NOT NULL DEFAULT '{}',
+        zodiac_sign TEXT,
+        education TEXT,
+        family_plans TEXT,
+        love_style TEXT,
+        pets TEXT,
+        drinking TEXT,
+        smoking TEXT,
+        workout TEXT,
+        social_media TEXT,
+        ask_me_1 TEXT,
+        ask_me_2 TEXT,
+        ask_me_3 TEXT,
+        job_title TEXT,
+        company TEXT,
+        school TEXT,
+        living_in TEXT,
+        anthem TEXT,
+        spotify_artists TEXT[] NOT NULL DEFAULT '{}',
+        gender TEXT,
+        sexual_orientation TEXT,
+        show_age BOOLEAN NOT NULL DEFAULT TRUE,
+        show_distance BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS about_prompt_question TEXT,
+      ADD COLUMN IF NOT EXISTS about_prompt_answer TEXT,
+      ADD COLUMN IF NOT EXISTS interests TEXT[] NOT NULL DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS relationship_goal TEXT,
+      ADD COLUMN IF NOT EXISTS pronouns TEXT,
+      ADD COLUMN IF NOT EXISTS height_cm INT,
+      ADD COLUMN IF NOT EXISTS languages TEXT[] NOT NULL DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS zodiac_sign TEXT,
+      ADD COLUMN IF NOT EXISTS education TEXT,
+      ADD COLUMN IF NOT EXISTS family_plans TEXT,
+      ADD COLUMN IF NOT EXISTS love_style TEXT,
+      ADD COLUMN IF NOT EXISTS pets TEXT,
+      ADD COLUMN IF NOT EXISTS drinking TEXT,
+      ADD COLUMN IF NOT EXISTS smoking TEXT,
+      ADD COLUMN IF NOT EXISTS workout TEXT,
+      ADD COLUMN IF NOT EXISTS social_media TEXT,
+      ADD COLUMN IF NOT EXISTS ask_me_1 TEXT,
+      ADD COLUMN IF NOT EXISTS ask_me_2 TEXT,
+      ADD COLUMN IF NOT EXISTS ask_me_3 TEXT,
+      ADD COLUMN IF NOT EXISTS job_title TEXT,
+      ADD COLUMN IF NOT EXISTS company TEXT,
+      ADD COLUMN IF NOT EXISTS school TEXT,
+      ADD COLUMN IF NOT EXISTS living_in TEXT,
+      ADD COLUMN IF NOT EXISTS anthem TEXT,
+      ADD COLUMN IF NOT EXISTS spotify_artists TEXT[] NOT NULL DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS gender TEXT,
+      ADD COLUMN IF NOT EXISTS sexual_orientation TEXT,
+      ADD COLUMN IF NOT EXISTS show_age BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS show_distance BOOLEAN NOT NULL DEFAULT TRUE;
     `);
 
     await client.query(`
@@ -953,6 +1066,123 @@ async function seedChatOnNewMatch(client, matchId, userAId, userBId) {
     `,
     [`cm_${uuidv4()}`, matchId, userBId, firstMessages[1]]
   );
+}
+
+function buildUserSelect(alias = "") {
+  const p = alias ? `${alias}.` : "";
+  return `
+    ${p}id,
+    ${p}name,
+    ${p}age,
+    ${p}city,
+    ${p}bio,
+    ${p}photo_url AS "photoUrl",
+    ${p}smart_photos_enabled AS "smartPhotosEnabled",
+    ${p}about_prompt_question AS "aboutPromptQuestion",
+    ${p}about_prompt_answer AS "aboutPromptAnswer",
+    ${p}interests,
+    ${p}relationship_goal AS "relationshipGoal",
+    ${p}pronouns,
+    ${p}height_cm AS "heightCm",
+    ${p}languages,
+    ${p}zodiac_sign AS "zodiacSign",
+    ${p}education,
+    ${p}family_plans AS "familyPlans",
+    ${p}love_style AS "loveStyle",
+    ${p}pets,
+    ${p}drinking,
+    ${p}smoking,
+    ${p}workout,
+    ${p}social_media AS "socialMedia",
+    ${p}ask_me_1 AS "askMe1",
+    ${p}ask_me_2 AS "askMe2",
+    ${p}ask_me_3 AS "askMe3",
+    ${p}job_title AS "jobTitle",
+    ${p}company,
+    ${p}school,
+    ${p}living_in AS "livingIn",
+    ${p}anthem,
+    ${p}spotify_artists AS "spotifyArtists",
+    ${p}gender,
+    ${p}sexual_orientation AS "sexualOrientation",
+    ${p}show_age AS "showAge",
+    ${p}show_distance AS "showDistance",
+    ${p}created_at AS "createdAt"
+  `;
+}
+
+function normalizeExtendedProfile(raw) {
+  const city = normalizeText(raw.city, 40) || "Sin ciudad";
+  return {
+    city,
+    bio: normalizeText(raw.bio, 180),
+    smartPhotosEnabled: normalizeBoolean(raw.smartPhotosEnabled, true),
+    aboutPromptQuestion: normalizeText(raw.aboutPromptQuestion, 80),
+    aboutPromptAnswer: normalizeText(raw.aboutPromptAnswer, 140),
+    interests: normalizeList(raw.interests, 12, 24),
+    relationshipGoal: normalizeText(raw.relationshipGoal, 40),
+    pronouns: normalizeText(raw.pronouns, 30),
+    heightCm: normalizeInt(raw.heightCm, 120, 230),
+    languages: normalizeList(raw.languages, 8, 24),
+    zodiacSign: normalizeText(raw.zodiacSign, 20),
+    education: normalizeText(raw.education, 50),
+    familyPlans: normalizeText(raw.familyPlans, 60),
+    loveStyle: normalizeText(raw.loveStyle, 40),
+    pets: normalizeText(raw.pets, 40),
+    drinking: normalizeText(raw.drinking, 30),
+    smoking: normalizeText(raw.smoking, 30),
+    workout: normalizeText(raw.workout, 30),
+    socialMedia: normalizeText(raw.socialMedia, 30),
+    askMe1: normalizeText(raw.askMe1, 80),
+    askMe2: normalizeText(raw.askMe2, 80),
+    askMe3: normalizeText(raw.askMe3, 80),
+    jobTitle: normalizeText(raw.jobTitle, 60),
+    company: normalizeText(raw.company, 60),
+    school: normalizeText(raw.school, 80),
+    livingIn: normalizeText(raw.livingIn, 40) || city,
+    anthem: normalizeText(raw.anthem, 100),
+    spotifyArtists: normalizeList(raw.spotifyArtists, 10, 40),
+    gender: normalizeText(raw.gender, 30),
+    sexualOrientation: normalizeText(raw.sexualOrientation, 40),
+    showAge: normalizeBoolean(raw.showAge, true),
+    showDistance: normalizeBoolean(raw.showDistance, true),
+  };
+}
+
+function validateRequiredProfile(profile) {
+  if (!profile.bio) return "bio_required";
+  if (profile.interests.length < 3) return "interests_min_3";
+  if (!profile.relationshipGoal) return "relationship_goal_required";
+  if (!profile.gender) return "gender_required";
+  return "";
+}
+
+function normalizeText(value, maxLen) {
+  return String(value || "").trim().slice(0, maxLen);
+}
+
+function normalizeList(value, maxItems, maxItemLen) {
+  const source = Array.isArray(value) ? value : String(value || "").split(",");
+  return source
+    .map((item) => normalizeText(item, maxItemLen))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function normalizeInt(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(min, Math.min(max, Math.round(numeric)));
+}
+
+function normalizeBoolean(value, fallback) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const s = value.trim().toLowerCase();
+    if (["true", "1", "on", "yes", "si"].includes(s)) return true;
+    if (["false", "0", "off", "no"].includes(s)) return false;
+  }
+  return fallback;
 }
 
 function formatMatch(row) {

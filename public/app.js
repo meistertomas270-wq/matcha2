@@ -45,6 +45,7 @@ const chatListEl = document.getElementById("chatList");
 const profileAvatarEl = document.getElementById("profileAvatar");
 const profileNameEl = document.getElementById("profileName");
 const profileBioEl = document.getElementById("profileBio");
+const profileExtraEl = document.getElementById("profileExtra");
 const statLikesEl = document.getElementById("statLikes");
 const statMatchesEl = document.getElementById("statMatches");
 const statChatsEl = document.getElementById("statChats");
@@ -221,6 +222,36 @@ async function onCreateProfile(event) {
     city: String(formData.get("city") || ""),
     bio: String(formData.get("bio") || ""),
     photoUrl: String(formData.get("photoUrl") || ""),
+    interests: parseCsvField(formData.get("interests")),
+    relationshipGoal: String(formData.get("relationshipGoal") || ""),
+    gender: String(formData.get("gender") || ""),
+    sexualOrientation: String(formData.get("sexualOrientation") || ""),
+    pronouns: String(formData.get("pronouns") || ""),
+    heightCm: Number(formData.get("heightCm")) || null,
+    languages: parseCsvField(formData.get("languages")),
+    zodiacSign: String(formData.get("zodiacSign") || ""),
+    education: String(formData.get("education") || ""),
+    familyPlans: String(formData.get("familyPlans") || ""),
+    loveStyle: String(formData.get("loveStyle") || ""),
+    pets: String(formData.get("pets") || ""),
+    drinking: String(formData.get("drinking") || ""),
+    smoking: String(formData.get("smoking") || ""),
+    workout: String(formData.get("workout") || ""),
+    socialMedia: String(formData.get("socialMedia") || ""),
+    aboutPromptQuestion: String(formData.get("aboutPromptQuestion") || ""),
+    aboutPromptAnswer: String(formData.get("aboutPromptAnswer") || ""),
+    askMe1: String(formData.get("askMe1") || ""),
+    askMe2: String(formData.get("askMe2") || ""),
+    askMe3: String(formData.get("askMe3") || ""),
+    jobTitle: String(formData.get("jobTitle") || ""),
+    company: String(formData.get("company") || ""),
+    school: String(formData.get("school") || ""),
+    livingIn: String(formData.get("livingIn") || ""),
+    anthem: String(formData.get("anthem") || ""),
+    spotifyArtists: parseCsvField(formData.get("spotifyArtists")),
+    smartPhotosEnabled: isChecked("smartPhotosEnabled"),
+    showAge: isChecked("showAge"),
+    showDistance: isChecked("showDistance"),
   };
 
   const created = await postJson("/api/auth/guest", payload).catch(() => null);
@@ -385,7 +416,10 @@ function createSwipeCard(profile, isTop, index) {
   card.style.transform = `scale(${1 - index * 0.035}) translateY(${index * 8}px)`;
   card.style.zIndex = String(20 - index);
 
-  const tags = buildInterests(profile.id);
+  const tags =
+    Array.isArray(profile.interests) && profile.interests.length
+      ? profile.interests.slice(0, 3)
+      : buildInterests(profile.id);
   card.innerHTML = `
     <div class="stamp pass">NOPE</div>
     <div class="stamp like">LIKE</div>
@@ -687,6 +721,7 @@ function renderProfile() {
   profileAvatarEl.src = state.user.photoUrl || buildFallbackPhoto(state.user.id);
   profileNameEl.textContent = `${state.user.name}, ${Number(state.user.age) || 0}`;
   profileBioEl.textContent = `${state.user.bio || "Sin bio"} - ${state.user.city || "Sin ciudad"}`;
+  profileExtraEl.innerHTML = buildProfileFacts(state.user);
 
   statLikesEl.textContent = String(state.likesSummary.likesReceived || 0);
   statMatchesEl.textContent = String(state.likesSummary.matchesCount || state.matches.length || 0);
@@ -803,12 +838,60 @@ function showToast(text) {
   }, 2200);
 }
 
+function buildProfileFacts(user) {
+  const items = [];
+  pushProfileFact(items, "Meta", user.relationshipGoal);
+  pushProfileFact(items, "Intereses", Array.isArray(user.interests) ? user.interests.join(", ") : "");
+  pushProfileFact(items, "Sexo", user.gender);
+  pushProfileFact(items, "Orientacion", user.sexualOrientation);
+  pushProfileFact(items, "Pronombres", user.pronouns);
+  pushProfileFact(items, "Altura", user.heightCm ? `${user.heightCm} cm` : "");
+  pushProfileFact(items, "Idiomas", Array.isArray(user.languages) ? user.languages.join(", ") : "");
+  pushProfileFact(items, "Educacion", user.education);
+  pushProfileFact(items, "Familia", user.familyPlans);
+  pushProfileFact(items, "Mascotas", user.pets);
+  pushProfileFact(items, "Beber", user.drinking);
+  pushProfileFact(items, "Fumar", user.smoking);
+  pushProfileFact(items, "Ejercicio", user.workout);
+  pushProfileFact(items, "Puesto", user.jobTitle);
+  pushProfileFact(items, "Compania", user.company);
+  pushProfileFact(items, "Estudios", user.school);
+  pushProfileFact(items, "Vive en", user.livingIn);
+  pushProfileFact(items, "Cancion", user.anthem);
+  pushProfileFact(
+    items,
+    "Spotify",
+    Array.isArray(user.spotifyArtists) ? user.spotifyArtists.join(", ") : ""
+  );
+  if (!items.length) {
+    return '<div class="profile-fact">Completa tu perfil para mejorar tus matches</div>';
+  }
+  return items.join("");
+}
+
+function pushProfileFact(items, label, value) {
+  if (!value) return;
+  items.push(`<div class="profile-fact"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</div>`);
+}
+
 function buildInterests(seed) {
   const hash = hashString(seed || "");
   const first = INTEREST_POOL[hash % INTEREST_POOL.length];
   const second = INTEREST_POOL[(hash + 3) % INTEREST_POOL.length];
   const third = INTEREST_POOL[(hash + 7) % INTEREST_POOL.length];
   return [first, second, third];
+}
+
+function parseCsvField(raw) {
+  return String(raw || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function isChecked(name) {
+  const field = onboardingForm.elements.namedItem(name);
+  return Boolean(field && field.checked);
 }
 
 function buildFallbackPhoto(seed) {
