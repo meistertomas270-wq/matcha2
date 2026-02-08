@@ -1403,3 +1403,148 @@ body {
     animation: none;
   }
 }
+
+/* Tinder-like refinement */
+.ui-icon {
+  font-size: 17px;
+  line-height: 1;
+  display: inline-grid;
+  place-items: center;
+}
+
+.header-actions .icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+}
+
+.swipe-filter-row {
+  margin-bottom: 12px;
+}
+
+.deck {
+  border-radius: 26px;
+}
+
+.card {
+  border-radius: 26px;
+}
+
+.card-title {
+  font-size: 32px;
+}
+
+.round-action {
+  width: 66px;
+  height: 66px;
+  font-size: 20px;
+  border: 1px solid rgba(196, 221, 236, 0.3);
+  background: linear-gradient(180deg, #193954, #122b43);
+}
+
+.round-action.small {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+
+.round-action.like {
+  color: #4bdf86;
+}
+
+.round-action.danger {
+  color: #ff6f72;
+}
+
+.round-action.star {
+  color: #4fb7ff;
+}
+
+.bottom-nav {
+  border-top: 0;
+  margin: 0 8px 8px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(19, 43, 64, 0.94), rgba(14, 31, 46, 0.96));
+  box-shadow: 0 10px 26px rgba(3, 12, 19, 0.45);
+}
+
+.nav-btn {
+  height: 48px;
+  border-radius: 12px;
+}
+
+.nav-btn .nav-icon {
+  font-size: 21px;
+}
+
+.nav-btn.active .nav-icon {
+  filter: drop-shadow(0 4px 12px rgba(255, 172, 140, 0.45));
+}
+
+.profile-avatar {
+  border-radius: 24px;
+}
+
+.likes-grid,
+.chat-list {
+  gap: 10px;
+}
+
+.modal-form {
+  border-radius: 18px;
+}
+
+.form-primary {
+  border-radius: 999px;
+  height: 44px;
+  background: linear-gradient(180deg, #ff7b69, #ff4c6e);
+  box-shadow: 0 10px 22px rgba(255, 90, 110, 0.34);
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(68, 98, 120, 0.36), rgba(90, 126, 150, 0.5), rgba(68, 98, 120, 0.36));
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.05s linear infinite;
+}
+
+.card-skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: 26px;
+}
+
+.card-skeleton.secondary {
+  transform: scale(0.96) translateY(10px);
+  opacity: 0.55;
+}
+
+.tile-skeleton {
+  height: 172px;
+  border-radius: 14px;
+}
+
+.mini-avatar-skeleton {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  flex: 0 0 auto;
+}
+
+.line-skeleton {
+  height: 72px;
+  border-radius: 14px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

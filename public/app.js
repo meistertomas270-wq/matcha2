@@ -15,6 +15,12 @@ const state = {
   activeChatId: null,
   activeChatMessages: [],
   swiping: false,
+  loading: {
+    stack: false,
+    likes: false,
+    chats: false,
+  },
+  onboardingPhotoUrls: [],
 };
 
 const screenTitleEl = document.getElementById("screenTitle");
@@ -67,6 +73,7 @@ const registerPasswordConfirm = document.getElementById("registerPasswordConfirm
 
 const onboardingDialog = document.getElementById("onboardingDialog");
 const onboardingForm = document.getElementById("onboardingForm");
+const onboardingSubmitBtn = onboardingForm?.querySelector('button[type="submit"]');
 const dobInput = document.getElementById("dobInput");
 const ageInput = document.getElementById("ageInput");
 const zodiacInput = document.getElementById("zodiacInput");
@@ -268,6 +275,7 @@ function bindEvents() {
 
 async function onCreateProfile(event) {
   event.preventDefault();
+  setOnboardingSubmitting(true);
   syncBirthData();
   const selectedInterests = parseCsvField(interestsInput?.value || "");
   const selectedGoal = String(relationshipGoalInput?.value || "").trim();
@@ -279,16 +287,27 @@ async function onCreateProfile(event) {
     showToast("Selecciona que tipo de relacion buscas");
     return;
   }
-  let photoUrls = await readPhotoFiles(photoFilesInput?.files);
+  const selectedLiving = String(livingInInput?.value || onboardingForm.elements.namedItem("livingIn")?.value || "").trim();
+  if (!selectedLiving) {
+    showToast("Selecciona donde vives");
+    return;
+  }
+  let photoUrls = Array.isArray(state.onboardingPhotoUrls) ? state.onboardingPhotoUrls.slice(0, 5) : [];
+  if (!photoUrls.length && photoFilesInput?.files?.length) {
+    photoUrls = await readPhotoFiles(photoFilesInput?.files);
+    state.onboardingPhotoUrls = photoUrls.slice(0, 5);
+  }
   if (!photoUrls.length && Array.isArray(state.user?.photoUrls) && state.user.photoUrls.length) {
     photoUrls = state.user.photoUrls.slice(0, 5);
   }
   if (!photoUrls.length) {
     showToast("Sube al menos 1 foto");
+    setOnboardingSubmitting(false);
     return;
   }
   if (photoUrls.length > 5) {
     showToast("Maximo 5 fotos");
+    setOnboardingSubmitting(false);
     return;
   }
   photoUrlsInput.value = `${photoUrls.length} fotos`;
@@ -298,7 +317,7 @@ async function onCreateProfile(event) {
     name: String(formData.get("name") || ""),
     age: Number(formData.get("age")) || 25,
     dob: String(formData.get("dob") || ""),
-    city: String(formData.get("livingIn") || ""),
+    city: selectedLiving,
     bio: String(formData.get("bio") || ""),
     photoUrls,
     photoUrl: String(photoUrls[0] || ""),
@@ -328,7 +347,7 @@ async function onCreateProfile(event) {
     jobTitle: String(formData.get("jobTitle") || ""),
     company: isChecked("employed") ? String(formData.get("company") || "") : "",
     school: String(formData.get("school") || ""),
-    livingIn: String(formData.get("livingIn") || ""),
+    livingIn: selectedLiving,
     spotifyArtists: parseCsvField(formData.get("spotifyArtists")),
     smartPhotosEnabled: isChecked("smartPhotosEnabled"),
     showAge: isChecked("showAge"),
@@ -341,13 +360,16 @@ async function onCreateProfile(event) {
   const endpoint = state.user?.id
     ? `/api/users/${encodeURIComponent(state.user.id)}/profile`
     : "/api/auth/guest";
-  const created = await postJson(endpoint, payload).catch(() => null);
+  const created = await postJson(endpoint, payload).catch((err) => ({ ok: false, error: err?.message || "" }));
   if (!created?.ok || !created.user) {
-    showToast("No se pudo guardar el perfil");
+    showToast(created?.error || "No se pudo guardar el perfil");
+    setOnboardingSubmitting(false);
     return;
   }
 
   closeDialog(onboardingDialog);
+  state.onboardingPhotoUrls = [];
+  setOnboardingSubmitting(false);
   await setCurrentUser(created.user);
 }
 
@@ -373,10 +395,13 @@ async function refreshAllData() {
 
 async function refreshStack() {
   if (!state.user) return;
+  state.loading.stack = true;
+  renderSwipeDeck();
   const response = await getJson(
     `/api/profiles/stack?userId=${encodeURIComponent(state.user.id)}&limit=18`
   ).catch(() => null);
   state.stack = response?.ok && Array.isArray(response.profiles) ? response.profiles : [];
+  state.loading.stack = false;
   renderSwipeDeck();
 }
 
@@ -393,6 +418,8 @@ async function refreshMatches() {
 
 async function refreshLikesSummary() {
   if (!state.user) return;
+  state.loading.likes = true;
+  renderLikes();
   const response = await getJson(
     `/api/likes/summary?userId=${encodeURIComponent(state.user.id)}`
   ).catch(() => null);
@@ -413,6 +440,7 @@ async function refreshLikesSummary() {
     };
   }
 
+  state.loading.likes = false;
   renderLikes();
   renderProfile();
   renderScreenMeta();
@@ -420,10 +448,13 @@ async function refreshLikesSummary() {
 
 async function refreshChats() {
   if (!state.user) return;
+  state.loading.chats = true;
+  renderChats();
   const response = await getJson(
     `/api/chats?userId=${encodeURIComponent(state.user.id)}`
   ).catch(() => null);
   state.chats = response?.ok && Array.isArray(response.chats) ? response.chats : [];
+  state.loading.chats = false;
   renderChats();
   renderProfile();
   renderScreenMeta();
@@ -476,6 +507,14 @@ function renderExploreCatalog() {
 
 function renderSwipeDeck() {
   deckEl.innerHTML = "";
+  if (state.loading.stack) {
+    deckEl.innerHTML = `
+      <div class="skeleton card-skeleton"></div>
+      <div class="skeleton card-skeleton secondary"></div>
+    `;
+    swipeStatusEl.textContent = "Cargando perfiles...";
+    return;
+  }
 
   if (!state.stack.length) {
     deckEl.innerHTML = `<div class="empty-state">No hay mas perfiles por ahora</div>`;
@@ -621,6 +660,11 @@ async function swipeTopCard(direction) {
 }
 
 function renderLikes() {
+  if (state.loading.likes) {
+    likesGridEl.innerHTML = `<div class="skeleton tile-skeleton"></div><div class="skeleton tile-skeleton"></div>`;
+    likesHintEl.textContent = "Cargando likes...";
+    return;
+  }
   const isLikesMode = state.likesMode === "likes";
   btnLikesMode.classList.toggle("active", isLikesMode);
   btnTopMode.classList.toggle("active", !isLikesMode);
@@ -662,6 +706,11 @@ function renderChats() {
 
 function renderNewMatchesRail() {
   newMatchesRailEl.innerHTML = "";
+  if (state.loading.chats) {
+    newMatchesRailEl.innerHTML =
+      '<div class="skeleton mini-avatar-skeleton"></div><div class="skeleton mini-avatar-skeleton"></div><div class="skeleton mini-avatar-skeleton"></div>';
+    return;
+  }
   if (!state.matches.length) {
     newMatchesRailEl.innerHTML = `<div class="empty-state">Todavia no hay matches</div>`;
     return;
@@ -688,6 +737,11 @@ function renderNewMatchesRail() {
 }
 
 function renderChatList() {
+  if (state.loading.chats) {
+    chatListEl.innerHTML =
+      '<div class="skeleton line-skeleton"></div><div class="skeleton line-skeleton"></div><div class="skeleton line-skeleton"></div>';
+    return;
+  }
   const needle = state.chatSearch;
   const chats = state.chats.filter((chat) => {
     if (!needle) return true;
@@ -829,9 +883,9 @@ async function onLoginSubmit(event) {
     password: String(formData.get("password") || ""),
   };
 
-  const response = await postJson("/api/auth/login", payload).catch(() => null);
+  const response = await postJson("/api/auth/login", payload).catch((err) => ({ ok: false, error: err?.message || "" }));
   if (!response?.ok || !response.user) {
-    showToast("Email o contrasena invalidos");
+    showToast(response?.error || "Email o contrasena invalidos");
     return;
   }
 
@@ -855,9 +909,9 @@ async function onRegisterSubmit(event) {
     email: String(formData.get("email") || ""),
     password: String(formData.get("password") || ""),
   };
-  const response = await postJson("/api/auth/register", payload).catch(() => null);
+  const response = await postJson("/api/auth/register", payload).catch((err) => ({ ok: false, error: err?.message || "" }));
   if (!response?.ok || !response.user) {
-    showToast("No se pudo registrar");
+    showToast(response?.error || "No se pudo registrar");
     return;
   }
 
@@ -955,7 +1009,9 @@ function openOnboarding() {
   } else {
     renderPhotoPreview([]);
     photoCountHint.textContent = "0/5 seleccionadas";
+    state.onboardingPhotoUrls = [];
   }
+  setOnboardingSubmitting(false);
   if (dobInput && !dobInput.value) {
     const d = new Date();
     d.setFullYear(d.getFullYear() - 25);
@@ -1161,6 +1217,7 @@ async function onPhotosChanged() {
     showToast("Maximo 5 fotos");
   }
   const previewUrls = await readPhotoFiles(files);
+  state.onboardingPhotoUrls = previewUrls.slice(0, 5);
   renderPhotoPreview(previewUrls);
 }
 
@@ -1257,7 +1314,28 @@ function fileToDataUrl(file) {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onload = () => {
+      const src = String(reader.result || "");
+      const image = new Image();
+      image.onload = () => {
+        const maxSize = 1280;
+        const ratio = Math.min(1, maxSize / image.width, maxSize / image.height);
+        const w = Math.max(1, Math.round(image.width * ratio));
+        const h = Math.max(1, Math.round(image.height * ratio));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(src);
+          return;
+        }
+        ctx.drawImage(image, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      image.onerror = () => resolve(src);
+      image.src = src;
+    };
     reader.onerror = () => resolve("");
     reader.readAsDataURL(file);
   });
@@ -1324,6 +1402,12 @@ function getPrimaryPhoto(profile) {
   return profile?.photoUrl || buildFallbackPhoto(profile?.id || "fallback");
 }
 
+function setOnboardingSubmitting(isSubmitting) {
+  if (!onboardingSubmitBtn) return;
+  onboardingSubmitBtn.disabled = isSubmitting;
+  onboardingSubmitBtn.textContent = isSubmitting ? "Guardando..." : "Entrar";
+}
+
 function isProfileComplete(user) {
   return Boolean(
     user &&
@@ -1381,10 +1465,16 @@ async function postJson(url, data) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!response.ok) {
-    throw new Error(`POST ${url} failed ${response.status}`);
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
   }
-  return response.json();
+  if (!response.ok) {
+    throw new Error(body?.error || `POST ${url} failed ${response.status}`);
+  }
+  return body || { ok: true };
 }
 
 function urlBase64ToUint8Array(base64String) {
