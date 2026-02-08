@@ -11,7 +11,11 @@ dotenv.config();
 const firebaseAdmin = safeRequire("firebase-admin");
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATABASE_URL = process.env.DATABASE_URL || "";
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  process.env.DATABASE_PUBLIC_URL ||
+  process.env.POSTGRES_URL ||
+  buildDatabaseUrlFromPgVars();
 
 if (!DATABASE_URL) {
   throw new Error("DATABASE_URL is required. Add Railway Postgres and set this variable.");
@@ -703,6 +707,22 @@ function formatMatch(row) {
 
 function sortPair(a, b) {
   return [a, b].sort((x, y) => x.localeCompare(y));
+}
+
+function buildDatabaseUrlFromPgVars() {
+  const host = process.env.PGHOST;
+  const port = process.env.PGPORT || "5432";
+  const user = process.env.PGUSER;
+  const password = process.env.PGPASSWORD;
+  const database = process.env.PGDATABASE;
+
+  if (!host || !user || !password || !database) {
+    return "";
+  }
+
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(
+    password
+  )}@${host}:${port}/${database}`;
 }
 
 function safeRequire(moduleName) {
