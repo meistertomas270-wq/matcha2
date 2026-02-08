@@ -9,8 +9,11 @@ Matcha is a Tinder-style project ready for:
 ## 1) What is included
 
 - Swipe/like/pass flow with match detection.
+- Mobile UI with 5 tabs: Swipe, Explorar, Likes, Chat, Perfil.
 - Profile creation (guest mode).
 - Match list UI.
+- Likes summary with top picks.
+- Chat list + chat messages per match.
 - Web push notifications for browser users.
 - Android WebView app with native notification handling.
 - `.bat` script to publish to GitHub quickly.
@@ -112,6 +115,10 @@ subir_github.bat https://github.com/your-user/your-repo.git
 - `GET /api/profiles/stack?userId=...` -> swipe deck.
 - `POST /api/swipes` -> register like/pass and detect match.
 - `GET /api/matches?userId=...` -> user matches.
+- `GET /api/likes/summary?userId=...` -> likes count + preview + top picks.
+- `GET /api/chats?userId=...` -> chat list.
+- `GET /api/chats/:chatId/messages?userId=...` -> chat messages.
+- `POST /api/chats/:chatId/messages` -> send message in chat.
 - `GET /api/push/public-key` -> VAPID public key.
 - `POST /api/push/subscribe` -> save web push subscription.
 - `POST /api/device/register` -> save Android FCM token.

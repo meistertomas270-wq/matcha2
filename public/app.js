@@ -1,27 +1,147 @@
 const state = {
   user: null,
+  tab: "swipe",
   stack: [],
+  matches: [],
+  likesSummary: {
+    likesReceived: 0,
+    likesPreview: [],
+    topPicks: [],
+    matchesCount: 0,
+  },
+  likesMode: "likes",
+  chats: [],
+  chatSearch: "",
+  activeChatId: null,
+  activeChatMessages: [],
   swiping: false,
 };
 
+const screenTitleEl = document.getElementById("screenTitle");
+const screenSubtitleEl = document.getElementById("screenSubtitle");
+const navButtons = Array.from(document.querySelectorAll("[data-tab-btn]"));
+const tabViews = Array.from(document.querySelectorAll("[data-tab-view]"));
+
 const deckEl = document.getElementById("deck");
-const matchesListEl = document.getElementById("matchesList");
-const statusTextEl = document.getElementById("statusText");
-const toastEl = document.getElementById("toast");
-const onboardingDialog = document.getElementById("onboardingDialog");
-const onboardingForm = document.getElementById("onboardingForm");
+const swipeStatusEl = document.getElementById("swipeStatus");
+const btnRewind = document.getElementById("btnRewind");
 const btnPass = document.getElementById("btnPass");
+const btnSuperLike = document.getElementById("btnSuperLike");
 const btnLike = document.getElementById("btnLike");
+const btnBoost = document.getElementById("btnBoost");
+
+const exploreGridEl = document.getElementById("exploreGrid");
+
+const btnLikesMode = document.getElementById("btnLikesMode");
+const btnTopMode = document.getElementById("btnTopMode");
+const likesHintEl = document.getElementById("likesHint");
+const likesGridEl = document.getElementById("likesGrid");
+const btnDiscoverLikes = document.getElementById("btnDiscoverLikes");
+
+const chatSearchEl = document.getElementById("chatSearch");
+const newMatchesRailEl = document.getElementById("newMatchesRail");
+const chatListEl = document.getElementById("chatList");
+
+const profileAvatarEl = document.getElementById("profileAvatar");
+const profileNameEl = document.getElementById("profileName");
+const profileBioEl = document.getElementById("profileBio");
+const statLikesEl = document.getElementById("statLikes");
+const statMatchesEl = document.getElementById("statMatches");
+const statChatsEl = document.getElementById("statChats");
+const btnEditProfile = document.getElementById("btnEditProfile");
+
 const btnNotif = document.getElementById("btnNotif");
 const btnReset = document.getElementById("btnReset");
+const btnNotifProfile = document.getElementById("btnNotifProfile");
+const btnResetProfile = document.getElementById("btnResetProfile");
+
+const onboardingDialog = document.getElementById("onboardingDialog");
+const onboardingForm = document.getElementById("onboardingForm");
+
+const chatDialog = document.getElementById("chatDialog");
+const chatDialogTitleEl = document.getElementById("chatDialogTitle");
+const chatDialogMetaEl = document.getElementById("chatDialogMeta");
+const chatMessagesEl = document.getElementById("chatMessages");
+const btnCloseChat = document.getElementById("btnCloseChat");
+const chatComposer = document.getElementById("chatComposer");
+const chatInput = document.getElementById("chatInput");
+
+const toastEl = document.getElementById("toast");
+
+const TAB_META = {
+  swipe: {
+    title: "Para ti",
+    subtitle: () => `${state.stack.length || 0} perfiles listos para deslizar`,
+  },
+  explore: {
+    title: "Explorar",
+    subtitle: () => "Nuevas vibes, planes y objetivos en una sola vista.",
+  },
+  likes: {
+    title: "Likes",
+    subtitle: () => `${state.likesSummary.likesReceived || 0} personas te dieron like`,
+  },
+  chat: {
+    title: "Chat",
+    subtitle: () => `${state.chats.length || 0} conversaciones activas`,
+  },
+  profile: {
+    title: "Perfil",
+    subtitle: () => (state.user ? `${state.user.city || "Sin ciudad"} - Matcha` : "Tu cuenta"),
+  },
+};
+
+const EXPLORE_ITEMS = [
+  {
+    title: "Relacion seria",
+    subtitle: "Personas que quieren estabilidad real.",
+    image:
+      "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Estoy libre hoy",
+    subtitle: "Planes espontaneos para hoy.",
+    image:
+      "https://images.unsplash.com/photo-1522542550221-31fd19575a2d?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Food dates",
+    subtitle: "Citas por cafe, ramen y brunch.",
+    image:
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Aire libre",
+    subtitle: "Senderismo, bici y escapadas cortas.",
+    image:
+      "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=900&q=80",
+  },
+];
+
+const INTEREST_POOL = [
+  "Naturaleza",
+  "Musica",
+  "Coffee",
+  "Viajes",
+  "Gym",
+  "Cine",
+  "Arte",
+  "Series",
+  "Pizza",
+  "Gaming",
+  "Yoga",
+  "Fotografia",
+];
 
 bootstrap().catch((err) => {
-  console.error(err);
-  setStatus("Error inicializando Matcha.");
+  console.error("bootstrap_error", err);
+  showToast("Error inicializando Matcha");
 });
 
 async function bootstrap() {
   bindEvents();
+  renderExploreCatalog();
+  renderScreenMeta();
   await registerServiceWorker();
 
   const cachedUserId = localStorage.getItem("matcha_user_id");
@@ -42,25 +162,58 @@ async function bootstrap() {
 
 function bindEvents() {
   onboardingForm.addEventListener("submit", onCreateProfile);
-  btnPass.addEventListener("click", () => swipeTopCard("pass"));
-  btnLike.addEventListener("click", () => swipeTopCard("like"));
-  btnNotif.addEventListener("click", () => enableNotifications());
-  btnReset.addEventListener("click", () => {
-    localStorage.removeItem("matcha_user_id");
-    window.location.reload();
-  });
-}
 
-function openOnboarding() {
-  if (typeof onboardingDialog.showModal === "function") {
-    onboardingDialog.showModal();
-  } else {
-    onboardingDialog.setAttribute("open", "open");
-  }
+  navButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.tabBtn;
+      setTab(tab);
+    });
+  });
+
+  btnRewind.addEventListener("click", () =>
+    showToast("Rewind disponible en Matcha Plus")
+  );
+  btnPass.addEventListener("click", () => swipeTopCard("pass"));
+  btnSuperLike.addEventListener("click", () => swipeTopCard("superlike"));
+  btnLike.addEventListener("click", () => swipeTopCard("like"));
+  btnBoost.addEventListener("click", () =>
+    showToast("Boost disponible en Matcha Plus")
+  );
+
+  btnLikesMode.addEventListener("click", () => {
+    state.likesMode = "likes";
+    renderLikes();
+  });
+  btnTopMode.addEventListener("click", () => {
+    state.likesMode = "top";
+    renderLikes();
+  });
+  btnDiscoverLikes.addEventListener("click", () =>
+    showToast("Proximamente: desbloqueo premium")
+  );
+
+  chatSearchEl.addEventListener("input", () => {
+    state.chatSearch = chatSearchEl.value.trim().toLowerCase();
+    renderChats();
+  });
+
+  btnEditProfile.addEventListener("click", () =>
+    showToast("Usa 'Cambiar perfil' para recrear tu cuenta")
+  );
+
+  btnNotif.addEventListener("click", enableNotifications);
+  btnNotifProfile.addEventListener("click", enableNotifications);
+
+  btnReset.addEventListener("click", hardResetProfile);
+  btnResetProfile.addEventListener("click", hardResetProfile);
+
+  btnCloseChat.addEventListener("click", closeChatDialog);
+  chatComposer.addEventListener("submit", onSendChatMessage);
 }
 
 async function onCreateProfile(event) {
   event.preventDefault();
+
   const formData = new FormData(onboardingForm);
   const payload = {
     name: String(formData.get("name") || ""),
@@ -72,84 +225,178 @@ async function onCreateProfile(event) {
 
   const created = await postJson("/api/auth/guest", payload).catch(() => null);
   if (!created?.ok || !created.user) {
-    showToast("No se pudo crear tu perfil.");
+    showToast("No se pudo crear el perfil");
     return;
   }
 
-  onboardingDialog.close();
+  closeDialog(onboardingDialog);
   await setCurrentUser(created.user);
 }
 
 async function setCurrentUser(user) {
   state.user = user;
   localStorage.setItem("matcha_user_id", user.id);
-  setStatus(`Hola ${user.name}. Empeza a deslizar.`);
   notifyAndroidUser(user.id);
-  await refreshStack();
-  await refreshMatches();
+
+  await refreshAllData();
+  setTab("swipe");
+  renderProfile();
+  showToast(`Bienvenido ${user.name}`);
+}
+
+async function refreshAllData() {
+  await Promise.all([
+    refreshStack(),
+    refreshMatches(),
+    refreshLikesSummary(),
+    refreshChats(),
+  ]);
 }
 
 async function refreshStack() {
-  if (!state.user) {
-    return;
-  }
+  if (!state.user) return;
   const response = await getJson(
-    `/api/profiles/stack?userId=${encodeURIComponent(state.user.id)}&limit=12`
+    `/api/profiles/stack?userId=${encodeURIComponent(state.user.id)}&limit=18`
   ).catch(() => null);
-
-  state.stack = response?.ok ? response.profiles : [];
-  renderDeck();
-  if (!state.stack.length) {
-    setStatus("No hay mas perfiles por ahora.");
-  }
+  state.stack = response?.ok && Array.isArray(response.profiles) ? response.profiles : [];
+  renderSwipeDeck();
 }
 
 async function refreshMatches() {
-  if (!state.user) {
-    return;
-  }
+  if (!state.user) return;
   const response = await getJson(
     `/api/matches?userId=${encodeURIComponent(state.user.id)}`
   ).catch(() => null);
-  const matches = response?.ok ? response.matches : [];
-  renderMatches(matches);
+  state.matches = response?.ok && Array.isArray(response.matches) ? response.matches : [];
+  renderChats();
+  renderProfile();
+  renderScreenMeta();
 }
 
-function renderDeck() {
+async function refreshLikesSummary() {
+  if (!state.user) return;
+  const response = await getJson(
+    `/api/likes/summary?userId=${encodeURIComponent(state.user.id)}`
+  ).catch(() => null);
+
+  if (response?.ok) {
+    state.likesSummary = {
+      likesReceived: Number(response.likesReceived || 0),
+      likesPreview: Array.isArray(response.likesPreview) ? response.likesPreview : [],
+      topPicks: Array.isArray(response.topPicks) ? response.topPicks : [],
+      matchesCount: Number(response.matchesCount || 0),
+    };
+  } else {
+    state.likesSummary = {
+      likesReceived: 0,
+      likesPreview: [],
+      topPicks: [],
+      matchesCount: state.matches.length,
+    };
+  }
+
+  renderLikes();
+  renderProfile();
+  renderScreenMeta();
+}
+
+async function refreshChats() {
+  if (!state.user) return;
+  const response = await getJson(
+    `/api/chats?userId=${encodeURIComponent(state.user.id)}`
+  ).catch(() => null);
+  state.chats = response?.ok && Array.isArray(response.chats) ? response.chats : [];
+  renderChats();
+  renderProfile();
+  renderScreenMeta();
+}
+
+function setTab(tab) {
+  if (!TAB_META[tab]) return;
+  state.tab = tab;
+
+  navButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.tabBtn === tab);
+  });
+  tabViews.forEach((view) => {
+    view.classList.toggle("active", view.dataset.tabView === tab);
+  });
+  renderScreenMeta();
+
+  if (tab === "likes") {
+    refreshLikesSummary();
+  }
+  if (tab === "chat") {
+    refreshChats();
+  }
+  if (tab === "swipe" && state.stack.length < 3) {
+    refreshStack();
+  }
+}
+
+function renderScreenMeta() {
+  const current = TAB_META[state.tab];
+  screenTitleEl.textContent = current.title;
+  screenSubtitleEl.textContent = current.subtitle();
+}
+
+function renderExploreCatalog() {
+  exploreGridEl.innerHTML = "";
+  EXPLORE_ITEMS.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "explore-card";
+    card.innerHTML = `
+      <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" loading="lazy" />
+      <div class="explore-info">
+        <h4>${escapeHtml(item.title)}</h4>
+        <p>${escapeHtml(item.subtitle)}</p>
+      </div>
+    `;
+    exploreGridEl.appendChild(card);
+  });
+}
+
+function renderSwipeDeck() {
   deckEl.innerHTML = "";
 
   if (!state.stack.length) {
-    const empty = document.createElement("div");
-    empty.className = "status";
-    empty.textContent = "Sin perfiles por mostrar.";
-    deckEl.appendChild(empty);
+    deckEl.innerHTML = `<div class="empty-state">No hay mas perfiles por ahora</div>`;
+    swipeStatusEl.textContent = "Sin perfiles. Prueba mas tarde.";
+    renderScreenMeta();
     return;
   }
 
   const visibleCards = state.stack.slice(0, 3);
   for (let i = visibleCards.length - 1; i >= 0; i -= 1) {
     const profile = visibleCards[i];
-    const isTop = i === 0;
-    const card = createCard(profile, isTop, i);
+    const card = createSwipeCard(profile, i === 0, i);
     deckEl.appendChild(card);
   }
+
+  swipeStatusEl.textContent = `${state.stack.length} perfiles en cola`;
+  renderScreenMeta();
 }
 
-function createCard(profile, isTop, index) {
+function createSwipeCard(profile, isTop, index) {
   const card = document.createElement("article");
   card.className = "card";
   card.dataset.userId = profile.id;
-  card.style.backgroundImage = `url("${profile.photoUrl}")`;
-  card.style.transform = `scale(${1 - index * 0.04}) translateY(${index * 7}px)`;
+  card.style.backgroundImage = `url("${escapeHtml(profile.photoUrl)}")`;
+  card.style.transform = `scale(${1 - index * 0.035}) translateY(${index * 8}px)`;
   card.style.zIndex = String(20 - index);
 
+  const tags = buildInterests(profile.id);
   card.innerHTML = `
     <div class="stamp pass">NOPE</div>
     <div class="stamp like">LIKE</div>
     <div class="card-meta">
-      <h3 class="card-name">${escapeHtml(profile.name)}, ${profile.age}</h3>
-      <p class="card-city">${escapeHtml(profile.city || "Sin ciudad")}</p>
-      <p class="card-bio">${escapeHtml(profile.bio || "Sin bio")}</p>
+      <h3 class="card-title">${escapeHtml(profile.name)}, ${Number(profile.age) || 0}</h3>
+      <p class="card-subtitle">${escapeHtml(profile.city || "Sin ciudad")} - ${escapeHtml(
+    profile.bio || ""
+  )}</p>
+      <div class="card-tags">
+        ${tags.map((tag) => `<span class="card-tag">${escapeHtml(tag)}</span>`).join("")}
+      </div>
     </div>
   `;
 
@@ -162,7 +409,7 @@ function createCard(profile, isTop, index) {
 function attachDrag(card) {
   let dragging = false;
   let startX = 0;
-  let currentX = 0;
+  let deltaX = 0;
 
   card.addEventListener("pointerdown", (event) => {
     if (state.swiping) return;
@@ -173,29 +420,29 @@ function attachDrag(card) {
 
   card.addEventListener("pointermove", (event) => {
     if (!dragging || state.swiping) return;
-    currentX = event.clientX - startX;
-    const rotate = currentX * 0.05;
+    deltaX = event.clientX - startX;
+    const rotate = deltaX * 0.05;
     card.style.transition = "none";
-    card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
-    paintStamps(card, currentX);
+    card.style.transform = `translateX(${deltaX}px) rotate(${rotate}deg)`;
+    paintStamps(card, deltaX);
   });
 
   const release = async () => {
     if (!dragging || state.swiping) return;
     dragging = false;
     const threshold = 95;
-    if (currentX > threshold) {
+    if (deltaX > threshold) {
       await swipeTopCard("like");
       return;
     }
-    if (currentX < -threshold) {
+    if (deltaX < -threshold) {
       await swipeTopCard("pass");
       return;
     }
-    card.style.transition = "transform 0.22s ease";
+    card.style.transition = "transform 0.2s ease";
     card.style.transform = "";
     paintStamps(card, 0);
-    currentX = 0;
+    deltaX = 0;
   };
 
   card.addEventListener("pointerup", release);
@@ -205,81 +452,254 @@ function attachDrag(card) {
 function paintStamps(card, dx) {
   const likeStamp = card.querySelector(".stamp.like");
   const passStamp = card.querySelector(".stamp.pass");
-  const likeAlpha = Math.max(0, Math.min(1, dx / 120));
-  const passAlpha = Math.max(0, Math.min(1, -dx / 120));
-  likeStamp.style.opacity = String(likeAlpha);
-  passStamp.style.opacity = String(passAlpha);
+  likeStamp.style.opacity = String(Math.max(0, Math.min(1, dx / 120)));
+  passStamp.style.opacity = String(Math.max(0, Math.min(1, -dx / 120)));
 }
 
 async function swipeTopCard(direction) {
-  if (state.swiping || !state.user || !state.stack.length) {
-    return;
-  }
+  if (!state.user || !state.stack.length || state.swiping) return;
+
+  const apiDirection = direction === "superlike" ? "like" : direction;
+  if (!["like", "pass"].includes(apiDirection)) return;
+
   state.swiping = true;
-  const topCard = deckEl.querySelector(".card:last-child");
   const target = state.stack[0];
+  const topCard = deckEl.querySelector(".card:last-child");
 
   if (topCard) {
-    const x = direction === "like" ? window.innerWidth * 1.1 : -window.innerWidth * 1.1;
-    topCard.style.transition = "transform 0.28s ease";
-    topCard.style.transform = `translateX(${x}px) rotate(${direction === "like" ? 18 : -18}deg)`;
+    const toX = apiDirection === "like" ? window.innerWidth * 1.08 : -window.innerWidth * 1.08;
+    const rot = apiDirection === "like" ? 16 : -16;
+    topCard.style.transition = "transform 0.25s ease";
+    topCard.style.transform = `translateX(${toX}px) rotate(${rot}deg)`;
   }
 
-  await sleep(240);
+  await sleep(220);
 
   const response = await postJson("/api/swipes", {
     userId: state.user.id,
     targetId: target.id,
-    direction,
+    direction: apiDirection,
   }).catch(() => null);
 
   state.stack.shift();
-  renderDeck();
-  setStatus(direction === "like" ? "Te gusta este perfil." : "Perfil descartado.");
+  renderSwipeDeck();
+  swipeStatusEl.textContent =
+    apiDirection === "like" ? "Te gusta este perfil" : "Perfil descartado";
 
   if (response?.ok && response.isMatch) {
     const title = `Match con ${target.name}`;
     showToast(title);
-    notifyAndroidLocal(title, "Tienen match en Matcha.");
-    maybeBrowserNotify(title, "Abrir Matcha para ver el match.");
-    await refreshMatches();
-  }
-
-  if (state.stack.length < 3) {
+    maybeBrowserNotify(title, "Abre Chat para hablar");
+    notifyAndroidLocal(title, "Hay match en Matcha");
+    await Promise.all([refreshMatches(), refreshChats(), refreshLikesSummary()]);
+  } else if (state.stack.length < 3) {
     await refreshStack();
   }
 
   state.swiping = false;
 }
 
-function renderMatches(matches) {
-  matchesListEl.innerHTML = "";
-  if (!matches.length) {
-    const empty = document.createElement("p");
-    empty.className = "status";
-    empty.textContent = "Todavia no hay matches.";
-    matchesListEl.appendChild(empty);
+function renderLikes() {
+  const isLikesMode = state.likesMode === "likes";
+  btnLikesMode.classList.toggle("active", isLikesMode);
+  btnTopMode.classList.toggle("active", !isLikesMode);
+  btnLikesMode.textContent = `${state.likesSummary.likesReceived} Likes`;
+
+  const list = isLikesMode ? state.likesSummary.likesPreview : state.likesSummary.topPicks;
+  likesGridEl.innerHTML = "";
+
+  if (!list.length) {
+    likesGridEl.innerHTML = `<div class="empty-state">No hay perfiles para mostrar</div>`;
+    likesHintEl.textContent = isLikesMode
+      ? "Todavia no hay likes pendientes en tu area."
+      : "Todavia no hay top picks disponibles.";
     return;
   }
 
-  for (const item of matches) {
-    const wrap = document.createElement("article");
-    wrap.className = "match-item";
-    wrap.innerHTML = `
-      <img src="${item.user.photoUrl}" alt="${escapeHtml(item.user.name)}" loading="lazy" />
-      <div>
-        <p class="match-name">${escapeHtml(item.user.name)}, ${item.user.age}</p>
-        <p class="match-city">${escapeHtml(item.user.city || "Sin ciudad")}</p>
+  likesHintEl.textContent = isLikesMode
+    ? "Asciende a Gold y descubre quien ya te dio like."
+    : "Top picks elegidos para tu perfil.";
+
+  list.forEach((profile) => {
+    const card = document.createElement("article");
+    card.className = `like-card ${isLikesMode ? "blur" : ""}`;
+    card.innerHTML = `
+      <img src="${escapeHtml(profile.photoUrl || "")}" alt="${escapeHtml(profile.name || "")}" loading="lazy" />
+      <div class="like-meta">
+        <h5>${escapeHtml(profile.name || "Perfil")}, ${Number(profile.age) || 0}</h5>
+        <p>${escapeHtml(profile.city || "Sin ciudad")}</p>
       </div>
     `;
-    matchesListEl.appendChild(wrap);
+    likesGridEl.appendChild(card);
+  });
+}
+
+function renderChats() {
+  renderNewMatchesRail();
+  renderChatList();
+}
+
+function renderNewMatchesRail() {
+  newMatchesRailEl.innerHTML = "";
+  if (!state.matches.length) {
+    newMatchesRailEl.innerHTML = `<div class="empty-state">Todavia no hay matches</div>`;
+    return;
   }
+
+  state.matches.slice(0, 12).forEach((match) => {
+    const chip = document.createElement("button");
+    chip.className = "match-chip";
+    chip.type = "button";
+    chip.innerHTML = `
+      <img src="${escapeHtml(match.user.photoUrl || "")}" alt="${escapeHtml(match.user.name || "")}" />
+      <span>${escapeHtml(match.user.name || "")}</span>
+    `;
+    chip.addEventListener("click", () => {
+      const chat = state.chats.find((c) => c.user.id === match.user.id);
+      if (chat) {
+        openChatDialog(chat.chatId);
+      } else {
+        showToast("Este match aun no tiene chat activo");
+      }
+    });
+    newMatchesRailEl.appendChild(chip);
+  });
+}
+
+function renderChatList() {
+  const needle = state.chatSearch;
+  const chats = state.chats.filter((chat) => {
+    if (!needle) return true;
+    const n = String(chat.user.name || "").toLowerCase();
+    const b = String(chat.lastMessage || "").toLowerCase();
+    return n.includes(needle) || b.includes(needle);
+  });
+
+  chatListEl.innerHTML = "";
+  if (!chats.length) {
+    chatListEl.innerHTML = `<div class="empty-state">Sin conversaciones por ahora</div>`;
+    return;
+  }
+
+  chats.forEach((chat) => {
+    const item = document.createElement("article");
+    item.className = "chat-item";
+    item.innerHTML = `
+      <img src="${escapeHtml(chat.user.photoUrl || "")}" alt="${escapeHtml(chat.user.name || "")}" />
+      <div class="chat-main">
+        <h4>${escapeHtml(chat.user.name || "Chat")}${chat.user.isOnline ? "  - activo" : ""}</h4>
+        <p>${escapeHtml(chat.lastMessage || "")}</p>
+      </div>
+      <div class="chat-meta">
+        <span class="chat-time">${formatTimeAgo(chat.lastMessageAt)}</span>
+        <span class="chat-badge ${chat.unreadCount ? "" : "hidden"}">${chat.unreadCount || ""}</span>
+      </div>
+    `;
+    item.addEventListener("click", () => openChatDialog(chat.chatId));
+    chatListEl.appendChild(item);
+  });
+}
+
+async function openChatDialog(chatId) {
+  if (!state.user) return;
+  const chat = state.chats.find((c) => c.chatId === chatId);
+  if (!chat) return;
+
+  state.activeChatId = chatId;
+  chatDialogTitleEl.textContent = chat.user.name || "Chat";
+  chatDialogMetaEl.textContent = `${chat.user.age || ""} ${chat.user.city || ""}`.trim();
+  chatMessagesEl.innerHTML = `<div class="empty-state">Cargando mensajes...</div>`;
+  openDialog(chatDialog);
+
+  const response = await getJson(
+    `/api/chats/${encodeURIComponent(chatId)}/messages?userId=${encodeURIComponent(state.user.id)}`
+  ).catch(() => null);
+
+  state.activeChatMessages =
+    response?.ok && Array.isArray(response.messages) ? response.messages : [];
+  markChatAsRead(chatId);
+  renderChatMessages();
+}
+
+function closeChatDialog() {
+  closeDialog(chatDialog);
+  state.activeChatId = null;
+  state.activeChatMessages = [];
+}
+
+function renderChatMessages() {
+  if (!state.activeChatMessages.length) {
+    chatMessagesEl.innerHTML = `<div class="empty-state">Sin mensajes todavia</div>`;
+    return;
+  }
+
+  chatMessagesEl.innerHTML = "";
+  state.activeChatMessages.forEach((message) => {
+    const bubble = document.createElement("article");
+    const mine = message.senderId === state.user?.id;
+    bubble.className = `bubble ${mine ? "me" : "them"}`;
+    bubble.innerHTML = `
+      <div>${escapeHtml(message.body || "")}</div>
+      <div class="bubble-time">${formatTimeAgo(message.createdAt)}</div>
+    `;
+    chatMessagesEl.appendChild(bubble);
+  });
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+async function onSendChatMessage(event) {
+  event.preventDefault();
+  if (!state.user || !state.activeChatId) return;
+
+  const body = String(chatInput.value || "").trim();
+  if (!body) return;
+
+  chatInput.value = "";
+  const payload = {
+    userId: state.user.id,
+    body,
+  };
+
+  const response = await postJson(
+    `/api/chats/${encodeURIComponent(state.activeChatId)}/messages`,
+    payload
+  ).catch(() => null);
+
+  if (!response?.ok || !response.message) {
+    showToast("No se pudo enviar");
+    return;
+  }
+
+  state.activeChatMessages.push(response.message);
+  renderChatMessages();
+  refreshChats();
+}
+
+function markChatAsRead(chatId) {
+  state.chats = state.chats.map((chat) =>
+    chat.chatId === chatId ? { ...chat, unreadCount: 0 } : chat
+  );
+  renderChatList();
+}
+
+function renderProfile() {
+  if (!state.user) return;
+  profileAvatarEl.src = state.user.photoUrl || buildFallbackPhoto(state.user.id);
+  profileNameEl.textContent = `${state.user.name}, ${Number(state.user.age) || 0}`;
+  profileBioEl.textContent = `${state.user.bio || "Sin bio"} - ${state.user.city || "Sin ciudad"}`;
+
+  statLikesEl.textContent = String(state.likesSummary.likesReceived || 0);
+  statMatchesEl.textContent = String(state.likesSummary.matchesCount || state.matches.length || 0);
+  statChatsEl.textContent = String(state.chats.length || 0);
+}
+
+function hardResetProfile() {
+  localStorage.removeItem("matcha_user_id");
+  window.location.reload();
 }
 
 async function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) {
-    return;
-  }
+  if (!("serviceWorker" in navigator)) return;
   try {
     await navigator.serviceWorker.register("/sw.js");
   } catch (err) {
@@ -289,16 +709,17 @@ async function registerServiceWorker() {
 
 async function enableNotifications() {
   if (!state.user) {
-    showToast("Primero crea tu perfil.");
+    showToast("Primero crea tu perfil");
     return;
   }
   if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-    showToast("Este navegador no soporta notificaciones push.");
+    showToast("Push no soportado en este navegador");
     return;
   }
+
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
-    showToast("Permiso de notificaciones denegado.");
+    showToast("Permiso de notificaciones denegado");
     return;
   }
 
@@ -307,6 +728,7 @@ async function enableNotifications() {
     if (!keyResp?.ok || !keyResp.publicKey) {
       throw new Error("missing_public_key");
     }
+
     const registration = await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
@@ -320,21 +742,11 @@ async function enableNotifications() {
       userId: state.user.id,
       subscription,
     });
-    showToast("Notificaciones activadas.");
+    showToast("Notificaciones activadas");
   } catch (err) {
-    console.error(err);
-    showToast("No se pudo activar notificaciones.");
+    console.error("enable_notifications_error", err);
+    showToast("No se pudo activar push");
   }
-}
-
-function setStatus(text) {
-  statusTextEl.textContent = text;
-}
-
-function showToast(text) {
-  toastEl.textContent = text;
-  toastEl.classList.add("show");
-  setTimeout(() => toastEl.classList.remove("show"), 2200);
 }
 
 function notifyAndroidUser(userId) {
@@ -352,6 +764,7 @@ function notifyAndroidLocal(title, body) {
 function maybeBrowserNotify(title, body) {
   if ("Notification" in window && Notification.permission === "granted") {
     try {
+      // eslint-disable-next-line no-new
       new Notification(title, { body });
     } catch {
       // ignore
@@ -359,24 +772,93 @@ function maybeBrowserNotify(title, body) {
   }
 }
 
-async function getJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`GET ${url} failed: ${res.status}`);
+function openOnboarding() {
+  openDialog(onboardingDialog);
+}
+
+function openDialog(dialog) {
+  if (!dialog) return;
+  if (dialog.hasAttribute("open")) return;
+  if (typeof dialog.showModal === "function") {
+    dialog.showModal();
+    return;
   }
-  return res.json();
+  dialog.setAttribute("open", "open");
+}
+
+function closeDialog(dialog) {
+  if (!dialog) return;
+  if (typeof dialog.close === "function") {
+    dialog.close();
+    return;
+  }
+  dialog.removeAttribute("open");
+}
+
+function showToast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.add("show");
+  setTimeout(() => {
+    toastEl.classList.remove("show");
+  }, 2200);
+}
+
+function buildInterests(seed) {
+  const hash = hashString(seed || "");
+  const first = INTEREST_POOL[hash % INTEREST_POOL.length];
+  const second = INTEREST_POOL[(hash + 3) % INTEREST_POOL.length];
+  const third = INTEREST_POOL[(hash + 7) % INTEREST_POOL.length];
+  return [first, second, third];
+}
+
+function buildFallbackPhoto(seed) {
+  return `https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80&seed=${encodeURIComponent(
+    seed
+  )}`;
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function formatTimeAgo(isoDate) {
+  if (!isoDate) return "";
+  const now = Date.now();
+  const date = new Date(isoDate).getTime();
+  if (Number.isNaN(date)) return "";
+  const diffMs = Math.max(0, now - date);
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "ahora";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
+async function getJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`GET ${url} failed ${response.status}`);
+  }
+  return response.json();
 }
 
 async function postJson(url, data) {
-  const res = await fetch(url, {
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    throw new Error(`POST ${url} failed: ${res.status}`);
+  if (!response.ok) {
+    throw new Error(`POST ${url} failed ${response.status}`);
   }
-  return res.json();
+  return response.json();
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -390,8 +872,8 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-function escapeHtml(str) {
-  return String(str)
+function escapeHtml(value) {
+  return String(value || "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")

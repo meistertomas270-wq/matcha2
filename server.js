@@ -276,6 +276,7 @@ app.post("/api/swipes", async (req, res) => {
         if (inserted.rowCount) {
           matchRow = inserted.rows[0];
           isNewMatch = true;
+          await seedChatOnNewMatch(client, matchRow.id, userId, targetId);
         } else {
           const existing = await client.query(
             `
@@ -357,6 +358,227 @@ app.get("/api/matches", async (req, res) => {
   } catch (err) {
     console.error("matches_error", err);
     return res.status(500).json({ ok: false, error: "matches_failed" });
+  }
+});
+
+app.get("/api/likes/summary", async (req, res) => {
+  try {
+    const userId = String(req.query.userId || "");
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: "userId_required" });
+    }
+
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (!userExists.rowCount) {
+      return res.status(404).json({ ok: false, error: "user_not_found" });
+    }
+
+    const likesReceivedRes = await pool.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM swipes
+      WHERE target_id = $1 AND direction = 'like'
+      `,
+      [userId]
+    );
+
+    const previewProfilesRes = await pool.query(
+      `
+      SELECT u.id, u.name, u.age, u.city, u.photo_url AS "photoUrl"
+      FROM swipes s
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN matches m
+        ON m.pair_key = CASE
+          WHEN s.user_id < s.target_id THEN s.user_id || '::' || s.target_id
+          ELSE s.target_id || '::' || s.user_id
+        END
+      WHERE s.target_id = $1
+        AND s.direction = 'like'
+        AND m.id IS NULL
+      ORDER BY s.created_at DESC
+      LIMIT 24
+      `,
+      [userId]
+    );
+
+    const topPicksRes = await pool.query(
+      `
+      SELECT id, name, age, city, photo_url AS "photoUrl"
+      FROM users
+      WHERE id <> $1
+      ORDER BY created_at DESC
+      LIMIT 8
+      `,
+      [userId]
+    );
+
+    const matchesCountRes = await pool.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM matches
+      WHERE user_a = $1 OR user_b = $1
+      `,
+      [userId]
+    );
+
+    return res.json({
+      ok: true,
+      likesReceived: likesReceivedRes.rows[0]?.count || 0,
+      likesPreview: previewProfilesRes.rows,
+      topPicks: topPicksRes.rows,
+      matchesCount: matchesCountRes.rows[0]?.count || 0,
+    });
+  } catch (err) {
+    console.error("likes_summary_error", err);
+    return res.status(500).json({ ok: false, error: "likes_summary_failed" });
+  }
+});
+
+app.get("/api/chats", async (req, res) => {
+  try {
+    const userId = String(req.query.userId || "");
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: "userId_required" });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT
+        m.id AS chat_id,
+        m.created_at AS match_created_at,
+        u.id AS user_id,
+        u.name,
+        u.age,
+        u.city,
+        u.photo_url AS photo_url,
+        lm.body AS last_message,
+        lm.sender_id AS last_sender_id,
+        lm.created_at AS last_message_at
+      FROM matches m
+      JOIN users u
+        ON u.id = CASE WHEN m.user_a = $1 THEN m.user_b ELSE m.user_a END
+      LEFT JOIN LATERAL (
+        SELECT body, sender_id, created_at
+        FROM chat_messages cm
+        WHERE cm.match_id = m.id
+        ORDER BY cm.created_at DESC
+        LIMIT 1
+      ) lm ON true
+      WHERE m.user_a = $1 OR m.user_b = $1
+      ORDER BY COALESCE(lm.created_at, m.created_at) DESC
+      `,
+      [userId]
+    );
+
+    const chats = rows.map((row) => {
+      const hasUnread = row.last_sender_id && row.last_sender_id !== userId;
+      return {
+        chatId: row.chat_id,
+        createdAt: row.match_created_at,
+        user: {
+          id: row.user_id,
+          name: row.name,
+          age: row.age,
+          city: row.city,
+          photoUrl: row.photo_url,
+          isOnline: hashString(row.user_id) % 3 !== 0,
+        },
+        lastMessage: row.last_message || "Hicieron match. Rompe el hielo.",
+        lastMessageAt: row.last_message_at || row.match_created_at,
+        unreadCount: hasUnread ? 1 : 0,
+      };
+    });
+
+    return res.json({ ok: true, chats });
+  } catch (err) {
+    console.error("chats_error", err);
+    return res.status(500).json({ ok: false, error: "chats_failed" });
+  }
+});
+
+app.get("/api/chats/:chatId/messages", async (req, res) => {
+  try {
+    const userId = String(req.query.userId || "");
+    const chatId = String(req.params.chatId || "");
+    if (!userId || !chatId) {
+      return res.status(400).json({ ok: false, error: "missing_fields" });
+    }
+
+    const membership = await pool.query(
+      `
+      SELECT id
+      FROM matches
+      WHERE id = $1 AND (user_a = $2 OR user_b = $2)
+      LIMIT 1
+      `,
+      [chatId, userId]
+    );
+    if (!membership.rowCount) {
+      return res.status(404).json({ ok: false, error: "chat_not_found" });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT
+        cm.id,
+        cm.sender_id AS "senderId",
+        cm.body,
+        cm.created_at AS "createdAt",
+        u.name AS "senderName"
+      FROM chat_messages cm
+      LEFT JOIN users u ON u.id = cm.sender_id
+      WHERE cm.match_id = $1
+      ORDER BY cm.created_at ASC
+      LIMIT 200
+      `,
+      [chatId]
+    );
+
+    return res.json({ ok: true, messages: rows });
+  } catch (err) {
+    console.error("chat_messages_error", err);
+    return res.status(500).json({ ok: false, error: "chat_messages_failed" });
+  }
+});
+
+app.post("/api/chats/:chatId/messages", async (req, res) => {
+  try {
+    const chatId = String(req.params.chatId || "");
+    const userId = String(req.body?.userId || "");
+    const body = String(req.body?.body || "").trim();
+    if (!chatId || !userId || !body) {
+      return res.status(400).json({ ok: false, error: "missing_fields" });
+    }
+    if (body.length > 600) {
+      return res.status(400).json({ ok: false, error: "message_too_long" });
+    }
+
+    const membership = await pool.query(
+      `
+      SELECT id
+      FROM matches
+      WHERE id = $1 AND (user_a = $2 OR user_b = $2)
+      LIMIT 1
+      `,
+      [chatId, userId]
+    );
+    if (!membership.rowCount) {
+      return res.status(404).json({ ok: false, error: "chat_not_found" });
+    }
+
+    const { rows } = await pool.query(
+      `
+      INSERT INTO chat_messages (id, match_id, sender_id, body, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      RETURNING id, sender_id AS "senderId", body, created_at AS "createdAt"
+      `,
+      [`cm_${uuidv4()}`, chatId, userId, body]
+    );
+
+    return res.json({ ok: true, message: rows[0] });
+  } catch (err) {
+    console.error("chat_send_error", err);
+    return res.status(500).json({ ok: false, error: "chat_send_failed" });
   }
 });
 
@@ -492,6 +714,21 @@ async function initDb() {
         pair_key TEXT NOT NULL UNIQUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+        sender_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        body TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_match_created_at
+      ON chat_messages (match_id, created_at DESC);
     `);
 
     await client.query(`
@@ -697,6 +934,27 @@ async function sendFcmToUser(userId, title, body) {
   }
 }
 
+async function seedChatOnNewMatch(client, matchId, userAId, userBId) {
+  const firstMessages = [
+    "Hola! Que tal tu dia?",
+    "Me gusto tu perfil. Te copa hablar un rato?",
+  ];
+  await client.query(
+    `
+    INSERT INTO chat_messages (id, match_id, sender_id, body, created_at)
+    VALUES ($1, $2, $3, $4, NOW())
+    `,
+    [`cm_${uuidv4()}`, matchId, userAId, firstMessages[0]]
+  );
+  await client.query(
+    `
+    INSERT INTO chat_messages (id, match_id, sender_id, body, created_at)
+    VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 second')
+    `,
+    [`cm_${uuidv4()}`, matchId, userBId, firstMessages[1]]
+  );
+}
+
 function formatMatch(row) {
   return {
     id: row.id,
@@ -707,6 +965,15 @@ function formatMatch(row) {
 
 function sortPair(a, b) {
   return [a, b].sort((x, y) => x.localeCompare(y));
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
 }
 
 function buildDatabaseUrlFromPgVars() {

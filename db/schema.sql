@@ -26,6 +26,17 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  sender_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_match_created_at
+ON chat_messages (match_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -2,48 +2,145 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Matcha</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-dot"></span>
-        <span class="brand-text">matcha</span>
-      </div>
-      <div class="topbar-actions">
-        <button id="btnNotif" class="chip">Notificaciones</button>
-        <button id="btnReset" class="chip ghost">Cambiar perfil</button>
-      </div>
-    </header>
-
-    <main class="main">
-      <section class="deck-area">
-        <div class="status-row">
-          <span id="statusText" class="status">Cargando perfiles...</span>
+    <div class="phone">
+      <header class="screen-header">
+        <div class="screen-title-wrap">
+          <h1 id="screenTitle" class="screen-title">Para ti</h1>
+          <p id="screenSubtitle" class="screen-subtitle">Desliza y encuentra nuevas conexiones.</p>
         </div>
-        <div id="deck" class="deck"></div>
-
-        <div class="actions">
-          <button id="btnPass" class="action pass" aria-label="No me gusta">X</button>
-          <button id="btnLike" class="action like" aria-label="Me gusta">❤</button>
+        <div class="header-actions">
+          <button id="btnNotif" class="icon-btn" type="button">Push</button>
+          <button id="btnReset" class="icon-btn ghost" type="button">Perfil</button>
         </div>
-      </section>
+      </header>
 
-      <aside class="matches">
-        <h2>Tus matches</h2>
-        <div id="matchesList" class="matches-list"></div>
-      </aside>
-    </main>
+      <main class="screen-main">
+        <section class="tab-view active" data-tab-view="swipe">
+          <div class="swipe-filter-row">
+            <button class="filter-pill active" type="button">Para ti</button>
+            <button class="filter-pill" type="button">Astrologia</button>
+            <button class="filter-pill" type="button">Double Date</button>
+          </div>
+
+          <div id="deck" class="deck"></div>
+          <p id="swipeStatus" class="micro-status">Cargando perfiles...</p>
+
+          <div class="swipe-actions">
+            <button id="btnRewind" class="round-action small" type="button">R</button>
+            <button id="btnPass" class="round-action danger" type="button">X</button>
+            <button id="btnSuperLike" class="round-action star" type="button">S</button>
+            <button id="btnLike" class="round-action like" type="button">L</button>
+            <button id="btnBoost" class="round-action small accent" type="button">B</button>
+          </div>
+        </section>
+
+        <section class="tab-view" data-tab-view="explore">
+          <article class="hero-card">
+            <img
+              src="https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=900&q=80"
+              alt="Pareja"
+            />
+            <div class="hero-overlay">
+              <h2>Pareja estable</h2>
+              <p>Conecta con personas que buscan lo mismo que vos.</p>
+            </div>
+          </article>
+          <div id="exploreGrid" class="explore-grid"></div>
+        </section>
+
+        <section class="tab-view" data-tab-view="likes">
+          <div class="likes-tabs">
+            <button id="btnLikesMode" class="likes-tab active" type="button">Likes</button>
+            <button id="btnTopMode" class="likes-tab" type="button">Top Picks</button>
+          </div>
+
+          <div class="likes-filter-row">
+            <span class="mini-pill">Cerca</span>
+            <span class="mini-pill">Bio</span>
+            <span class="mini-pill">Verificado</span>
+            <span class="mini-pill">Reciente</span>
+          </div>
+
+          <p id="likesHint" class="likes-hint">Cargando likes...</p>
+          <div id="likesGrid" class="likes-grid"></div>
+          <button id="btnDiscoverLikes" class="cta-gold" type="button">Descubre a quien le gustas</button>
+        </section>
+
+        <section class="tab-view" data-tab-view="chat">
+          <label class="chat-search-wrap">
+            <input id="chatSearch" type="search" placeholder="Buscar matches" />
+          </label>
+
+          <div>
+            <h3 class="section-title">Parejas nuevas</h3>
+            <div id="newMatchesRail" class="new-matches-rail"></div>
+          </div>
+
+          <div>
+            <h3 class="section-title">Mensajes</h3>
+            <div id="chatList" class="chat-list"></div>
+          </div>
+        </section>
+
+        <section class="tab-view" data-tab-view="profile">
+          <article class="profile-card">
+            <div class="profile-top">
+              <img id="profileAvatar" class="profile-avatar" alt="Avatar" />
+              <div>
+                <h2 id="profileName" class="profile-name">Perfil</h2>
+                <p id="profileBio" class="profile-bio"></p>
+                <button id="btnEditProfile" class="edit-profile-btn" type="button">Editar perfil</button>
+              </div>
+            </div>
+          </article>
+
+          <div class="profile-stats">
+            <article class="stat-card">
+              <h4>Likes</h4>
+              <p id="statLikes">0</p>
+            </article>
+            <article class="stat-card">
+              <h4>Matches</h4>
+              <p id="statMatches">0</p>
+            </article>
+            <article class="stat-card">
+              <h4>Chats</h4>
+              <p id="statChats">0</p>
+            </article>
+          </div>
+
+          <article class="premium-card">
+            <h3>Matcha Plus</h3>
+            <p>Ve quien te dio like y desbloquea top picks sin blur.</p>
+            <button type="button" class="premium-btn">Actualizar</button>
+          </article>
+
+          <div class="profile-actions">
+            <button id="btnNotifProfile" class="settings-btn" type="button">Activar notificaciones</button>
+            <button id="btnResetProfile" class="settings-btn danger-line" type="button">Cambiar perfil</button>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav">
+        <button class="nav-btn active" data-tab-btn="swipe" type="button">Swipe</button>
+        <button class="nav-btn" data-tab-btn="explore" type="button">Explorar</button>
+        <button class="nav-btn" data-tab-btn="likes" type="button">Likes</button>
+        <button class="nav-btn" data-tab-btn="chat" type="button">Chat</button>
+        <button class="nav-btn" data-tab-btn="profile" type="button">Perfil</button>
+      </nav>
+    </div>
   </div>
 
-  <div id="toast" class="toast" aria-live="polite"></div>
-
-  <dialog id="onboardingDialog" class="onboarding">
-    <form id="onboardingForm" class="onboarding-form">
-      <h2>Crear perfil en Matcha</h2>
+  <dialog id="onboardingDialog" class="modal">
+    <form id="onboardingForm" class="modal-form">
+      <h2>Crear perfil Matcha</h2>
       <label>
         Nombre
         <input name="name" maxlength="30" required placeholder="Tu nombre" />
@@ -61,12 +158,33 @@
         <textarea name="bio" maxlength="180" rows="3" placeholder="Conta algo de vos"></textarea>
       </label>
       <label>
-        URL de foto (opcional)
+        URL de foto
         <input name="photoUrl" type="url" placeholder="https://..." />
       </label>
-      <button type="submit" class="primary">Entrar</button>
+      <button type="submit" class="form-primary">Entrar</button>
     </form>
   </dialog>
+
+  <dialog id="chatDialog" class="chat-modal">
+    <div class="chat-modal-shell">
+      <header class="chat-modal-header">
+        <div>
+          <h3 id="chatDialogTitle">Chat</h3>
+          <p id="chatDialogMeta">Matcha</p>
+        </div>
+        <button id="btnCloseChat" class="icon-btn ghost" type="button">Cerrar</button>
+      </header>
+
+      <div id="chatMessages" class="chat-messages"></div>
+
+      <form id="chatComposer" class="chat-composer">
+        <input id="chatInput" maxlength="600" placeholder="Escribe un mensaje..." />
+        <button type="submit">Enviar</button>
+      </form>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
 
   <script src="/app.js" defer></script>
 </body>
