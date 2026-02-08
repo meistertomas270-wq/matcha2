@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matcha</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-text">matcha</span>
+      </div>
+      <div class="topbar-actions">
+        <button id="btnNotif" class="chip">Notificaciones</button>
+        <button id="btnReset" class="chip ghost">Cambiar perfil</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="deck-area">
+        <div class="status-row">
+          <span id="statusText" class="status">Cargando perfiles...</span>
+        </div>
+        <div id="deck" class="deck"></div>
+
+        <div class="actions">
+          <button id="btnPass" class="action pass" aria-label="No me gusta">X</button>
+          <button id="btnLike" class="action like" aria-label="Me gusta">❤</button>
+        </div>
+      </section>
+
+      <aside class="matches">
+        <h2>Tus matches</h2>
+        <div id="matchesList" class="matches-list"></div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <dialog id="onboardingDialog" class="onboarding">
+    <form id="onboardingForm" class="onboarding-form">
+      <h2>Crear perfil en Matcha</h2>
+      <label>
+        Nombre
+        <input name="name" maxlength="30" required placeholder="Tu nombre" />
+      </label>
+      <label>
+        Edad
+        <input name="age" type="number" min="18" max="99" value="25" required />
+      </label>
+      <label>
+        Ciudad
+        <input name="city" maxlength="40" placeholder="Tu ciudad" />
+      </label>
+      <label>
+        Bio
+        <textarea name="bio" maxlength="180" rows="3" placeholder="Conta algo de vos"></textarea>
+      </label>
+      <label>
+        URL de foto (opcional)
+        <input name="photoUrl" type="url" placeholder="https://..." />
+      </label>
+      <button type="submit" class="primary">Entrar</button>
+    </form>
+  </dialog>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

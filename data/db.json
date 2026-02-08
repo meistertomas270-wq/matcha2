@@ -1,0 +1,56 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "name": "Sofia",
+      "age": 26,
+      "city": "Buenos Aires",
+      "bio": "Cafe, fotografia y escapadas cortas.",
+      "photoUrl": "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      "id": "u2",
+      "name": "Mateo",
+      "age": 29,
+      "city": "Cordoba",
+      "bio": "Runner de manana. Pizza de noche.",
+      "photoUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      "id": "u3",
+      "name": "Valentina",
+      "age": 24,
+      "city": "Rosario",
+      "bio": "Diseno, sushi y playlists raras.",
+      "photoUrl": "https://images.unsplash.com/photo-1464863979621-258859e62245?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      "id": "u4",
+      "name": "Franco",
+      "age": 31,
+      "city": "Mendoza",
+      "bio": "Vino, montana y humor negro.",
+      "photoUrl": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      "id": "u5",
+      "name": "Camila",
+      "age": 27,
+      "city": "La Plata",
+      "bio": "Minimalismo, yoga y ramen.",
+      "photoUrl": "https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&w=900&q=80"
+    },
+    {
+      "id": "u6",
+      "name": "Nicolas",
+      "age": 28,
+      "city": "Mar del Plata",
+      "bio": "Surf, codigo y cafe fuerte.",
+      "photoUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=900&q=80"
+    }
+  ],
+  "swipes": [],
+  "matches": [],
+  "pushSubscriptions": [],
+  "deviceTokens": []
+}

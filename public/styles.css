@@ -1,0 +1,395 @@
+:root {
+  --bg-main: radial-gradient(1200px 900px at 10% 10%, #fff5e6 0%, #ffe6d6 28%, #ffd2c6 52%, #ffd8e6 100%);
+  --card-shadow: 0 24px 44px rgba(44, 15, 8, 0.16);
+  --text-dark: #2b1611;
+  --text-soft: #6f4f46;
+  --accent-like: #1aa765;
+  --accent-pass: #de4f3c;
+  --chip-bg: rgba(255, 255, 255, 0.75);
+  --surface: rgba(255, 255, 255, 0.92);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: var(--text-dark);
+  background: var(--bg-main);
+}
+
+body {
+  padding: 16px;
+}
+
+.app-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  text-transform: lowercase;
+  letter-spacing: 0.6px;
+}
+
+.brand-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff8758, #ff4d4d);
+  box-shadow: 0 2px 7px rgba(255, 80, 48, 0.6);
+}
+
+.brand-text {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 700;
+  background: var(--chip-bg);
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.chip.ghost {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 300px;
+  gap: 16px;
+}
+
+.deck-area,
+.matches {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 14px;
+  box-shadow: 0 14px 24px rgba(36, 13, 8, 0.12);
+  backdrop-filter: blur(4px);
+}
+
+.status-row {
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.status {
+  font-size: 14px;
+  color: var(--text-soft);
+}
+
+.deck {
+  position: relative;
+  height: 66vh;
+  min-height: 440px;
+  max-height: 700px;
+  border-radius: 18px;
+  overflow: visible;
+}
+
+.card {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  touch-action: none;
+  transform-origin: 50% 85%;
+  transition: transform 0.25s ease;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(14, 7, 5, 0.74) 10%, rgba(25, 8, 3, 0.08) 58%);
+}
+
+.card-meta {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1;
+  color: #fff;
+}
+
+.card-name {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 3px;
+}
+
+.card-city {
+  margin: 0 0 8px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.card-bio {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.3;
+  opacity: 0.92;
+}
+
+.stamp {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  padding: 7px 12px;
+  border: 3px solid;
+  border-radius: 8px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  opacity: 0;
+  transform: rotate(-8deg);
+}
+
+.stamp.like {
+  right: 14px;
+  color: var(--accent-like);
+  border-color: var(--accent-like);
+}
+
+.stamp.pass {
+  left: 14px;
+  color: var(--accent-pass);
+  border-color: var(--accent-pass);
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.action {
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 0;
+  font-size: 28px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(23, 9, 7, 0.15);
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.action:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.action.pass {
+  background: #fff;
+  color: var(--accent-pass);
+}
+
+.action.like {
+  background: linear-gradient(180deg, #3ed68a, #1ca062);
+  color: #fff;
+}
+
+.matches h2 {
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.matches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 68vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.match-item {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 10px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.match-item img {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.match-name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.match-city {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%) translateY(25px);
+  background: rgba(39, 20, 12, 0.92);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease;
+  font-size: 14px;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.onboarding {
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  width: min(440px, 92vw);
+}
+
+.onboarding::backdrop {
+  background: rgba(16, 9, 5, 0.56);
+}
+
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+}
+
+.onboarding-form h2 {
+  margin: 0 0 4px;
+}
+
+.onboarding-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.onboarding-form input,
+.onboarding-form textarea {
+  border: 1px solid rgba(146, 98, 82, 0.3);
+  border-radius: 9px;
+  padding: 9px 10px;
+  font: inherit;
+  color: var(--text-dark);
+}
+
+.onboarding-form textarea {
+  resize: vertical;
+}
+
+.primary {
+  margin-top: 6px;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, #ff7f5a, #ea4d4b);
+  cursor: pointer;
+}
+
+@media (max-width: 930px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .deck {
+    height: 58vh;
+    min-height: 420px;
+  }
+
+  .matches-list {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 520px) {
+  body {
+    padding: 10px;
+  }
+
+  .brand-text {
+    font-size: 24px;
+  }
+
+  .chip {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .deck-area,
+  .matches {
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .deck {
+    min-height: 390px;
+  }
+
+  .actions {
+    gap: 12px;
+  }
+
+  .action {
+    width: 62px;
+    height: 62px;
+  }
+}
