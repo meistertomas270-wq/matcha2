@@ -57,6 +57,14 @@ const btnNotifProfile = document.getElementById("btnNotifProfile");
 const btnResetProfile = document.getElementById("btnResetProfile");
 const btnLogoutProfile = document.getElementById("btnLogoutProfile");
 
+const authDialog = document.getElementById("authDialog");
+const btnAuthLoginTab = document.getElementById("btnAuthLoginTab");
+const btnAuthRegisterTab = document.getElementById("btnAuthRegisterTab");
+const loginForm = document.getElementById("loginForm");
+const registerForm = document.getElementById("registerForm");
+const registerPassword = document.getElementById("registerPassword");
+const registerPasswordConfirm = document.getElementById("registerPasswordConfirm");
+
 const onboardingDialog = document.getElementById("onboardingDialog");
 const onboardingForm = document.getElementById("onboardingForm");
 const dobInput = document.getElementById("dobInput");
@@ -170,21 +178,28 @@ async function bootstrap() {
 
   const cachedUserId = localStorage.getItem("matcha_user_id");
   if (!cachedUserId) {
-    openOnboarding();
+    openAuth();
     return;
   }
 
   const me = await getJson(`/api/users/${cachedUserId}`).catch(() => null);
   if (!me?.ok || !me.user) {
     localStorage.removeItem("matcha_user_id");
-    openOnboarding();
+    openAuth();
     return;
   }
 
   await setCurrentUser(me.user);
+  if (!isProfileComplete(me.user)) {
+    openOnboarding();
+  }
 }
 
 function bindEvents() {
+  loginForm?.addEventListener("submit", onLoginSubmit);
+  registerForm?.addEventListener("submit", onRegisterSubmit);
+  btnAuthLoginTab?.addEventListener("click", () => setAuthTab("login"));
+  btnAuthRegisterTab?.addEventListener("click", () => setAuthTab("register"));
   onboardingForm.addEventListener("submit", onCreateProfile);
   bindChipPicker(interestsPicker, interestsInput, Number(interestsPicker?.dataset.max || 6));
   bindChipPicker(languagesPicker, languagesInput, Number(languagesPicker?.dataset.max || 4));
@@ -309,9 +324,12 @@ async function onCreateProfile(event) {
     payload.pronouns = "";
   }
 
-  const created = await postJson("/api/auth/guest", payload).catch(() => null);
+  const endpoint = state.user?.id
+    ? `/api/users/${encodeURIComponent(state.user.id)}/profile`
+    : "/api/auth/guest";
+  const created = await postJson(endpoint, payload).catch(() => null);
   if (!created?.ok || !created.user) {
-    showToast("No se pudo crear el perfil");
+    showToast("No se pudo guardar el perfil");
     return;
   }
 
@@ -789,6 +807,59 @@ function hardResetProfile() {
   window.location.reload();
 }
 
+async function onLoginSubmit(event) {
+  event.preventDefault();
+  const formData = new FormData(loginForm);
+  const payload = {
+    email: String(formData.get("email") || ""),
+    password: String(formData.get("password") || ""),
+  };
+
+  const response = await postJson("/api/auth/login", payload).catch(() => null);
+  if (!response?.ok || !response.user) {
+    showToast("Email o contrasena invalidos");
+    return;
+  }
+
+  closeDialog(authDialog);
+  await setCurrentUser(response.user);
+  if (!response.profileComplete || !isProfileComplete(response.user)) {
+    openOnboarding();
+  }
+}
+
+async function onRegisterSubmit(event) {
+  event.preventDefault();
+  if (!registerPassword || !registerPasswordConfirm) return;
+  if (registerPassword.value !== registerPasswordConfirm.value) {
+    showToast("Las contrasenas no coinciden");
+    return;
+  }
+
+  const formData = new FormData(registerForm);
+  const payload = {
+    email: String(formData.get("email") || ""),
+    password: String(formData.get("password") || ""),
+  };
+  const response = await postJson("/api/auth/register", payload).catch(() => null);
+  if (!response?.ok || !response.user) {
+    showToast("No se pudo registrar");
+    return;
+  }
+
+  closeDialog(authDialog);
+  await setCurrentUser(response.user);
+  openOnboarding();
+}
+
+function setAuthTab(mode) {
+  const isLogin = mode === "login";
+  btnAuthLoginTab?.classList.toggle("active", isLogin);
+  btnAuthRegisterTab?.classList.toggle("active", !isLogin);
+  loginForm?.classList.toggle("hidden", !isLogin);
+  registerForm?.classList.toggle("hidden", isLogin);
+}
+
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   try {
@@ -864,6 +935,10 @@ function maybeBrowserNotify(title, body) {
 }
 
 function openOnboarding() {
+  closeDialog(authDialog);
+  if (state.user) {
+    hydrateOnboardingFromUser(state.user);
+  }
   if (dobInput && !dobInput.value) {
     const d = new Date();
     d.setFullYear(d.getFullYear() - 25);
@@ -871,6 +946,14 @@ function openOnboarding() {
     syncBirthData();
   }
   openDialog(onboardingDialog);
+}
+
+function openAuth() {
+  closeDialog(onboardingDialog);
+  loginForm?.reset();
+  registerForm?.reset();
+  setAuthTab("login");
+  openDialog(authDialog);
 }
 
 function openDialog(dialog) {
@@ -951,6 +1034,58 @@ function buildInterests(seed) {
   return [first, second, third];
 }
 
+function hydrateOnboardingFromUser(user) {
+  if (!user || !onboardingForm) return;
+  setFormValue("name", user.name || "");
+  setFormValue("bio", user.bio || "");
+  setFormValue("dob", user.dob || "");
+  setFormValue("gender", user.gender || "");
+  setFormValue("sexualOrientation", user.sexualOrientation || "");
+  setFormValue("pronouns", user.pronouns || "");
+  setFormValue("heightCm", user.heightCm || "");
+  setFormValue("education", user.education || "");
+  setFormValue("familyPlans", user.familyPlans || "");
+  setFormValue("loveStyle", user.loveStyle || "");
+  setFormValue("pets", user.pets || "");
+  setFormValue("drinking", user.drinking || "");
+  setFormValue("smoking", user.smoking || "");
+  setFormValue("workout", user.workout || "");
+  setFormValue("socialMedia", user.socialMedia || "");
+  setFormValue("aboutPromptQuestion", user.aboutPromptQuestion || "");
+  setFormValue("aboutPromptAnswer", user.aboutPromptAnswer || "");
+  setFormValue("askMe1", user.askMe1 || "");
+  setFormValue("askMe2", user.askMe2 || "");
+  setFormValue("askMe3", user.askMe3 || "");
+  setFormValue("jobTitle", user.jobTitle || "");
+  setFormValue("company", user.company || "");
+  setFormValue("school", user.school || "");
+  setFormValue("livingIn", user.livingIn || user.city || "");
+  setFormValue(
+    "spotifyArtists",
+    Array.isArray(user.spotifyArtists) ? user.spotifyArtists.join(", ") : ""
+  );
+
+  politicsInput.value = user.politics || "derecha";
+  showZodiacInput.checked = user.showZodiac !== false;
+  syncPoliticsPronouns();
+  syncWorkFields();
+  setChipValues(interestsPicker, interestsInput, user.interests || []);
+  setChipValues(languagesPicker, languagesInput, user.languages || []);
+  setChipValues(
+    relationshipPicker,
+    relationshipGoalInput,
+    user.relationshipGoal ? [user.relationshipGoal] : []
+  );
+  syncBirthData();
+}
+
+function setFormValue(name, value) {
+  const field = onboardingForm.elements.namedItem(name);
+  if (field) {
+    field.value = String(value ?? "");
+  }
+}
+
 function bindChipPicker(container, hiddenInput, maxSelection) {
   if (!container || !hiddenInput) return;
   container.addEventListener("click", (event) => {
@@ -976,6 +1111,16 @@ function bindChipPicker(container, hiddenInput, maxSelection) {
     );
     hiddenInput.value = values.join(",");
   });
+}
+
+function setChipValues(container, hiddenInput, values) {
+  if (!container || !hiddenInput) return;
+  const set = new Set((Array.isArray(values) ? values : []).map((v) => String(v).trim()));
+  container.querySelectorAll(".chip-btn").forEach((button) => {
+    const value = String(button.dataset.value || "").trim();
+    button.classList.toggle("active", set.has(value));
+  });
+  hiddenInput.value = Array.from(set).join(",");
 }
 
 function bindFoldSelects() {
@@ -1139,6 +1284,19 @@ function getPrimaryPhoto(profile) {
     return profile.photoUrls[0];
   }
   return profile?.photoUrl || buildFallbackPhoto(profile?.id || "fallback");
+}
+
+function isProfileComplete(user) {
+  return Boolean(
+    user &&
+      String(user.bio || "").trim() &&
+      Array.isArray(user.interests) &&
+      user.interests.length > 0 &&
+      String(user.relationshipGoal || "").trim() &&
+      String(user.gender || "").trim() &&
+      String(user.livingIn || user.city || "").trim() &&
+      ((Array.isArray(user.photoUrls) && user.photoUrls.length > 0) || String(user.photoUrl || "").trim())
+  );
 }
 
 function buildFallbackPhoto(seed) {

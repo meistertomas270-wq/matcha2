@@ -140,6 +140,46 @@
     </div>
   </div>
 
+  <dialog id="authDialog" class="modal auth-modal">
+    <div class="auth-shell">
+      <h2 class="auth-title">Matcha</h2>
+      <p class="auth-subtitle">Conoce gente nueva cerca de vos.</p>
+
+      <div class="auth-tabs">
+        <button id="btnAuthLoginTab" class="auth-tab active" type="button">Iniciar sesion</button>
+        <button id="btnAuthRegisterTab" class="auth-tab" type="button">Registrarse</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <label>
+          Email
+          <input name="email" type="email" required placeholder="tu@email.com" />
+        </label>
+        <label>
+          Contrasena
+          <input name="password" type="password" required minlength="8" placeholder="Minimo 8 caracteres" />
+        </label>
+        <button class="form-primary auth-primary" type="submit">Entrar</button>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden">
+        <label>
+          Email
+          <input name="email" type="email" required placeholder="tu@email.com" />
+        </label>
+        <label>
+          Contrasena
+          <input id="registerPassword" name="password" type="password" required minlength="8" placeholder="Minimo 8 caracteres" />
+        </label>
+        <label>
+          Confirmar contrasena
+          <input id="registerPasswordConfirm" name="passwordConfirm" type="password" required minlength="8" placeholder="Repite la contrasena" />
+        </label>
+        <button class="form-primary auth-primary" type="submit">Crear cuenta</button>
+      </form>
+    </div>
+  </dialog>
+
   <dialog id="onboardingDialog" class="modal">
     <form id="onboardingForm" class="modal-form">
       <h2>Editar perfil</h2>

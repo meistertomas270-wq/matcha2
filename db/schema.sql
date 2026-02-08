@@ -1,5 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
+  email TEXT,
+  password_salt TEXT,
+  password_hash TEXT,
   name TEXT NOT NULL,
   age INT NOT NULL,
   city TEXT NOT NULL,
@@ -41,6 +44,10 @@ CREATE TABLE IF NOT EXISTS users (
   show_distance BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+ON users (LOWER(email))
+WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS swipes (
   id TEXT PRIMARY KEY,

@@ -587,6 +587,10 @@ body {
   display: none;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .profile-card {
   background: linear-gradient(180deg, #152640, #111c31);
   border-radius: 18px;
@@ -751,6 +755,72 @@ body {
   width: min(430px, 92vw);
   background: #0d1526;
   color: #fff;
+}
+
+.auth-modal {
+  width: min(420px, 92vw);
+}
+
+.auth-shell {
+  padding: 22px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-title {
+  margin: 0;
+  text-align: center;
+  font-size: 36px;
+  letter-spacing: 0.3px;
+}
+
+.auth-subtitle {
+  margin: 0;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.auth-tab {
+  border: 1px solid rgba(168, 199, 220, 0.28);
+  border-radius: 999px;
+  background: #102439;
+  color: #d7e9f5;
+  font-weight: 600;
+  padding: 9px 12px;
+}
+
+.auth-tab.active {
+  border-color: rgba(255, 175, 146, 0.7);
+  background: linear-gradient(180deg, rgba(255, 127, 99, 0.32), rgba(210, 88, 69, 0.26));
+  color: #fff6f2;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #c8d8e4;
+}
+
+.auth-primary {
+  margin-top: 4px;
+  height: 44px;
+  font-size: 14px;
 }
 
 .modal::backdrop,

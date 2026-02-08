@@ -1,4 +1,5 @@
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -117,6 +118,93 @@ app.get("/health", async (_req, res) => {
   }
 });
 
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    if (!email) {
+      return res.status(400).json({ ok: false, error: "email_required" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ ok: false, error: "password_min_8" });
+    }
+
+    const existing = await pool.query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [email]);
+    if (existing.rowCount) {
+      return res.status(409).json({ ok: false, error: "email_already_used" });
+    }
+
+    const { salt, hash } = hashPassword(password);
+    const userId = `u_${uuidv4()}`;
+    const defaultName = email.split("@")[0].slice(0, 30) || "Usuario";
+    const defaultPhoto =
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80";
+
+    const { rows } = await pool.query(
+      `
+      INSERT INTO users (
+        id, name, age, city, bio, photo_url, photo_urls, email, password_salt, password_hash, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, $9, $10, NOW())
+      RETURNING ${buildUserSelect("")}
+      `,
+      [userId, defaultName, 25, "Sin ciudad", "", defaultPhoto, [defaultPhoto], email, salt, hash]
+    );
+
+    return res.json({
+      ok: true,
+      user: rows[0],
+      profileComplete: isProfileComplete(rows[0]),
+      token: Buffer.from(userId).toString("base64url"),
+    });
+  } catch (err) {
+    console.error("register_error", err);
+    return res.status(500).json({ ok: false, error: "register_failed" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: "credentials_required" });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT ${buildUserSelect("")}, password_salt AS "passwordSalt", password_hash AS "passwordHash"
+      FROM users
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1
+      `,
+      [email]
+    );
+    const user = rows[0];
+    if (!user?.passwordSalt || !user?.passwordHash) {
+      return res.status(401).json({ ok: false, error: "invalid_credentials" });
+    }
+
+    const valid = verifyPassword(password, user.passwordSalt, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ ok: false, error: "invalid_credentials" });
+    }
+
+    delete user.passwordSalt;
+    delete user.passwordHash;
+
+    return res.json({
+      ok: true,
+      user,
+      profileComplete: isProfileComplete(user),
+      token: Buffer.from(user.id).toString("base64url"),
+    });
+  } catch (err) {
+    console.error("login_error", err);
+    return res.status(500).json({ ok: false, error: "login_failed" });
+  }
+});
+
 app.post("/api/auth/guest", async (req, res) => {
   try {
     const payload = req.body || {};
@@ -206,6 +294,129 @@ app.post("/api/auth/guest", async (req, res) => {
   } catch (err) {
     console.error("guest_auth_error", err);
     return res.status(500).json({ ok: false, error: "guest_auth_failed" });
+  }
+});
+
+app.post("/api/users/:userId/profile", async (req, res) => {
+  try {
+    const userId = String(req.params.userId || "");
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: "user_id_required" });
+    }
+
+    const current = await pool.query(
+      `SELECT ${buildUserSelect("")} FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (!current.rowCount) {
+      return res.status(404).json({ ok: false, error: "user_not_found" });
+    }
+    const previous = current.rows[0];
+
+    const payload = req.body || {};
+    const profile = normalizeExtendedProfile(payload);
+    const validationError = validateRequiredProfile(profile);
+    if (validationError) {
+      return res.status(400).json({ ok: false, error: validationError });
+    }
+
+    const resolvedAge = resolveAge(payload.age || previous.age, profile.dob || previous.dob);
+    const name = normalizeText(payload.name, 30) || previous.name;
+
+    const { rows } = await pool.query(
+      `
+      UPDATE users
+      SET
+        name = $2,
+        age = $3,
+        city = $4,
+        bio = $5,
+        photo_url = $6,
+        photo_urls = $7,
+        smart_photos_enabled = $8,
+        about_prompt_question = $9,
+        about_prompt_answer = $10,
+        interests = $11,
+        relationship_goal = $12,
+        politics = $13,
+        pronouns = $14,
+        height_cm = $15,
+        languages = $16,
+        zodiac_sign = $17,
+        show_zodiac = $18,
+        dob = $19,
+        education = $20,
+        family_plans = $21,
+        love_style = $22,
+        pets = $23,
+        drinking = $24,
+        smoking = $25,
+        workout = $26,
+        social_media = $27,
+        ask_me_1 = $28,
+        ask_me_2 = $29,
+        ask_me_3 = $30,
+        job_title = $31,
+        company = $32,
+        school = $33,
+        living_in = $34,
+        anthem = $35,
+        spotify_artists = $36,
+        gender = $37,
+        sexual_orientation = $38,
+        show_age = $39,
+        show_distance = $40
+      WHERE id = $1
+      RETURNING ${buildUserSelect("")}
+      `,
+      [
+        userId,
+        name,
+        resolvedAge,
+        profile.city,
+        profile.bio,
+        profile.photoUrls[0] || previous.photoUrl,
+        profile.photoUrls,
+        profile.smartPhotosEnabled,
+        profile.aboutPromptQuestion,
+        profile.aboutPromptAnswer,
+        profile.interests,
+        profile.relationshipGoal,
+        profile.politics,
+        profile.pronouns,
+        profile.heightCm,
+        profile.languages,
+        profile.zodiacSign,
+        profile.showZodiac,
+        profile.dob || null,
+        profile.education,
+        profile.familyPlans,
+        profile.loveStyle,
+        profile.pets,
+        profile.drinking,
+        profile.smoking,
+        profile.workout,
+        profile.socialMedia,
+        profile.askMe1,
+        profile.askMe2,
+        profile.askMe3,
+        profile.jobTitle,
+        profile.company,
+        profile.school,
+        profile.livingIn,
+        profile.anthem,
+        profile.spotifyArtists,
+        profile.gender,
+        profile.sexualOrientation,
+        profile.showAge,
+        profile.showDistance,
+      ]
+    );
+
+    return res.json({ ok: true, user: rows[0], profileComplete: isProfileComplete(rows[0]) });
+  } catch (err) {
+    console.error("update_profile_error", err);
+    return res.status(500).json({ ok: false, error: "update_profile_failed" });
   }
 });
 
@@ -738,6 +949,9 @@ async function initDb() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
+        email TEXT,
+        password_salt TEXT,
+        password_hash TEXT,
         name TEXT NOT NULL,
         age INT NOT NULL,
         city TEXT NOT NULL,
@@ -783,6 +997,9 @@ async function initDb() {
 
     await client.query(`
       ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email TEXT,
+      ADD COLUMN IF NOT EXISTS password_salt TEXT,
+      ADD COLUMN IF NOT EXISTS password_hash TEXT,
       ADD COLUMN IF NOT EXISTS photo_urls TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS about_prompt_question TEXT,
@@ -817,6 +1034,12 @@ async function initDb() {
       ADD COLUMN IF NOT EXISTS sexual_orientation TEXT,
       ADD COLUMN IF NOT EXISTS show_age BOOLEAN NOT NULL DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS show_distance BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+      ON users (LOWER(email))
+      WHERE email IS NOT NULL
     `);
 
     await client.query(`
@@ -1091,6 +1314,7 @@ function buildUserSelect(alias = "") {
   const p = alias ? `${alias}.` : "";
   return `
     ${p}id,
+    ${p}email,
     ${p}name,
     ${p}age,
     ${p}city,
@@ -1191,6 +1415,19 @@ function validateRequiredProfile(profile) {
   return "";
 }
 
+function isProfileComplete(user) {
+  return Boolean(
+    user &&
+      String(user.bio || "").trim() &&
+      Array.isArray(user.interests) &&
+      user.interests.length > 0 &&
+      String(user.relationshipGoal || "").trim() &&
+      String(user.gender || "").trim() &&
+      String(user.livingIn || user.city || "").trim() &&
+      ((Array.isArray(user.photoUrls) && user.photoUrls.length > 0) || String(user.photoUrl || "").trim())
+  );
+}
+
 function normalizeText(value, maxLen) {
   return String(value || "").trim().slice(0, maxLen);
 }
@@ -1238,6 +1475,29 @@ function normalizeBoolean(value, fallback) {
     if (["false", "0", "off", "no"].includes(s)) return false;
   }
   return fallback;
+}
+
+function normalizeEmail(value) {
+  const email = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!email) return "";
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return ok ? email.slice(0, 120) : "";
+}
+
+function hashPassword(password, saltHex) {
+  const salt = saltHex || crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return { salt, hash };
+}
+
+function verifyPassword(password, salt, expectedHash) {
+  const { hash } = hashPassword(password, salt);
+  const a = Buffer.from(hash, "hex");
+  const b = Buffer.from(String(expectedHash || ""), "hex");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 function resolveAge(ageInput, dob) {
