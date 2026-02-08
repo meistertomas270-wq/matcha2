@@ -740,6 +740,14 @@ body {
   color: var(--text-soft);
   font-size: 11px;
   cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.nav-icon {
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
 }
 
 .nav-btn.active {

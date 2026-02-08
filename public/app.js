@@ -269,6 +269,16 @@ function bindEvents() {
 async function onCreateProfile(event) {
   event.preventDefault();
   syncBirthData();
+  const selectedInterests = parseCsvField(interestsInput?.value || "");
+  const selectedGoal = String(relationshipGoalInput?.value || "").trim();
+  if (!selectedInterests.length) {
+    showToast("Selecciona al menos 1 interes");
+    return;
+  }
+  if (!selectedGoal) {
+    showToast("Selecciona que tipo de relacion buscas");
+    return;
+  }
   let photoUrls = await readPhotoFiles(photoFilesInput?.files);
   if (!photoUrls.length && Array.isArray(state.user?.photoUrls) && state.user.photoUrls.length) {
     photoUrls = state.user.photoUrls.slice(0, 5);
@@ -292,8 +302,8 @@ async function onCreateProfile(event) {
     bio: String(formData.get("bio") || ""),
     photoUrls,
     photoUrl: String(photoUrls[0] || ""),
-    interests: parseCsvField(formData.get("interests")),
-    relationshipGoal: String(formData.get("relationshipGoal") || ""),
+    interests: selectedInterests,
+    relationshipGoal: selectedGoal,
     politics: String(formData.get("politics") || "derecha"),
     gender: String(formData.get("gender") || ""),
     sexualOrientation: String(formData.get("sexualOrientation") || ""),
