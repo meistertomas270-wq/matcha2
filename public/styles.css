@@ -2407,6 +2407,122 @@ body {
   border-color: #ff6f7f !important;
 }
 
+/* Hard override: Tinder-like compact profile + full-screen swipe stamps */
+.tab-view[data-tab-view="profile"] {
+  height: calc(100dvh - 150px) !important;
+  overflow: hidden !important;
+  gap: 6px !important;
+}
+
+.tab-view[data-tab-view="profile"] .profile-teaser-card {
+  padding: 8px 10px !important;
+}
+
+.tab-view[data-tab-view="profile"] .perks-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+.tab-view[data-tab-view="profile"] .profile-more,
+.tab-view[data-tab-view="profile"] .profile-actions {
+  display: none !important;
+}
+
+.tab-view[data-tab-view="profile"] .premium-card-v2 {
+  padding: 9px !important;
+}
+
+.tab-view[data-tab-view="profile"] .premium-card-v2 h3 {
+  font-size: 16px !important;
+}
+
+.tab-view[data-tab-view="profile"] .premium-card-v2 p {
+  font-size: 10px !important;
+  margin: 4px 0 0 !important;
+}
+
+.tab-view[data-tab-view="profile"] .profile-stats.compact .stat-card {
+  padding: 7px 5px !important;
+}
+
+.tab-view[data-tab-view="profile"] .profile-stats.compact .stat-card p {
+  font-size: 16px !important;
+}
+
+.stamp {
+  top: 50% !important;
+  left: 20px !important;
+  right: 20px !important;
+  width: auto !important;
+  text-align: center !important;
+  transform: translateY(-50%) !important;
+  font-size: clamp(42px, 11vw, 74px) !important;
+  padding: 14px 0 !important;
+  border-width: 5px !important;
+  border-radius: 16px !important;
+  letter-spacing: 2px !important;
+  background: rgba(2, 7, 15, 0.35);
+  backdrop-filter: blur(2px);
+}
+
+.stamp.like {
+  color: #7bffac !important;
+  border-color: #7bffac !important;
+}
+
+.stamp.pass {
+  color: #ff7688 !important;
+  border-color: #ff7688 !important;
+}
+
+.card.will-like .swipe-tint.like {
+  opacity: 0.62 !important;
+}
+
+.card.will-pass .swipe-tint.pass {
+  opacity: 0.62 !important;
+}
+
+.card.will-like .stamp.like,
+.card.will-pass .stamp.pass {
+  opacity: 1 !important;
+  transform: translateY(-50%) scale(1.06) !important;
+}
+
+.match-shell {
+  max-width: 410px;
+}
+
+.match-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 8px;
+}
+
+.match-hero img {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255, 88, 142, 0.7);
+  box-shadow: 0 8px 24px rgba(255, 72, 129, 0.3);
+}
+
+.match-hero h4 {
+  margin: 0;
+  font-size: 20px;
+  text-align: center;
+}
+
+.match-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .toast {
   border-radius: 12px;
   padding: 10px 12px;

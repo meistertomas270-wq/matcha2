@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Matcha</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=20260209b" />
 </head>
 <body>
   <div class="app-shell">
@@ -585,8 +585,28 @@
     </div>
   </dialog>
 
+  <dialog id="matchDialog" class="chat-modal">
+    <div class="chat-modal-shell match-shell">
+      <header class="chat-modal-header">
+        <div>
+          <h3>¡It’s a Match!</h3>
+          <p>Les gustaron mutuamente</p>
+        </div>
+        <button id="btnCloseMatchDialog" class="icon-btn ghost" type="button">Cerrar</button>
+      </header>
+      <article class="match-hero">
+        <img id="matchAvatar" alt="Match" />
+        <h4 id="matchTitle">Tuvieron match</h4>
+      </article>
+      <div class="match-actions">
+        <button id="btnKeepSwiping" type="button" class="settings-btn">Seguir deslizando</button>
+        <button id="btnGoToMatchChat" type="button" class="form-primary">Enviar mensaje</button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast" aria-live="polite"></div>
 
-  <script src="/app.js" defer></script>
+  <script src="/app.js?v=20260209b" defer></script>
 </body>
 </html>

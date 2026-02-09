@@ -130,6 +130,14 @@ const btnCloseProfilePreview = document.getElementById("btnCloseProfilePreview")
 const swipeProfileDialog = document.getElementById("swipeProfileDialog");
 const swipeProfileCard = document.getElementById("swipeProfileCard");
 const btnCloseSwipeProfile = document.getElementById("btnCloseSwipeProfile");
+const matchDialog = document.getElementById("matchDialog");
+const btnCloseMatchDialog = document.getElementById("btnCloseMatchDialog");
+const btnKeepSwiping = document.getElementById("btnKeepSwiping");
+const btnGoToMatchChat = document.getElementById("btnGoToMatchChat");
+const matchAvatar = document.getElementById("matchAvatar");
+const matchTitle = document.getElementById("matchTitle");
+
+let pendingMatchUserId = "";
 
 const toastEl = document.getElementById("toast");
 
@@ -299,6 +307,9 @@ function bindEvents() {
   btnCloseChat.addEventListener("click", closeChatDialog);
   btnCloseProfilePreview?.addEventListener("click", closeProfilePreview);
   btnCloseSwipeProfile?.addEventListener("click", closeSwipeProfile);
+  btnCloseMatchDialog?.addEventListener("click", closeMatchDialog);
+  btnKeepSwiping?.addEventListener("click", closeMatchDialog);
+  btnGoToMatchChat?.addEventListener("click", goToPendingMatchChat);
   chatComposer.addEventListener("submit", onSendChatMessage);
 
   dobInput?.addEventListener("change", syncBirthData);
@@ -691,6 +702,8 @@ function attachDrag(card) {
     card.style.transform = `translateX(${deltaX}px) rotate(${rotate}deg)`;
     paintStamps(card, deltaX);
     const direction = deltaX > 110 ? "like" : deltaX < -110 ? "pass" : "";
+    card.classList.toggle("will-like", direction === "like");
+    card.classList.toggle("will-pass", direction === "pass");
     if (direction && direction !== vibratedDirection && navigator.vibrate) {
       navigator.vibrate(8);
       vibratedDirection = direction;
@@ -716,6 +729,7 @@ function attachDrag(card) {
     if (wasTap) {
       cycleCardPhoto(card, startX);
     }
+    card.classList.remove("will-like", "will-pass");
     card.style.transition = "transform 0.2s ease";
     card.style.transform = "";
     paintStamps(card, 0);
@@ -785,6 +799,7 @@ async function swipeTopCard(direction) {
     maybeBrowserNotify(title, "Abre Chat para hablar");
     notifyAndroidLocal(title, "Hay match en Matcha");
     await Promise.all([refreshMatches(true), refreshChats(true), refreshLikesSummary(true)]);
+    openMatchDialog(target);
   }
 }
 
@@ -953,6 +968,36 @@ async function openSwipeProfile(profile) {
 
 function closeSwipeProfile() {
   closeDialog(swipeProfileDialog);
+}
+
+function openMatchDialog(profile) {
+  if (!matchDialog) return;
+  pendingMatchUserId = String(profile?.id || "");
+  if (matchAvatar) {
+    matchAvatar.src = getPrimaryPhoto(profile || {});
+  }
+  if (matchTitle) {
+    matchTitle.textContent = `Hiciste match con ${profile?.name || "alguien"}`;
+  }
+  openDialog(matchDialog);
+}
+
+function closeMatchDialog() {
+  closeDialog(matchDialog);
+}
+
+function goToPendingMatchChat() {
+  closeMatchDialog();
+  if (!pendingMatchUserId) {
+    setTab("chat");
+    return;
+  }
+  const chat = state.chats.find((item) => item?.user?.id === pendingMatchUserId);
+  if (chat?.chatId) {
+    openChatDialog(chat.chatId);
+    return;
+  }
+  setTab("chat");
 }
 
 function renderChatMessages() {
