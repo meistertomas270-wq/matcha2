@@ -1427,7 +1427,7 @@ function buildSwipeCardSelect(alias = "") {
     ${p}age,
     ${p}city,
     ${p}bio,
-    ${p}photo_url AS "photoUrl",
+    COALESCE(${p}photo_thumb_urls[1], ${p}photo_url) AS "photoUrl",
     ${p}interests,
     ${p}relationship_goal AS "relationshipGoal"
   `;
@@ -1521,7 +1521,7 @@ function normalizePhotoList(value, maxItems) {
   const source = Array.isArray(value) ? value : [];
   return source
     .map((item) => String(item || "").trim())
-    .filter((item) => item.startsWith("data:image/"))
+    .filter((item) => item.startsWith("data:image/") || /^https?:\/\//i.test(item))
     .slice(0, maxItems);
 }
 

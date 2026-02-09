@@ -188,7 +188,9 @@ async function bootstrap() {
   bindEvents();
   renderExploreCatalog();
   renderScreenMeta();
-  await registerServiceWorker();
+  registerServiceWorker().catch((err) => {
+    console.warn("sw_register_failed", err);
+  });
 
   const cachedUserId = localStorage.getItem("matcha_user_id");
   if (!cachedUserId) {
@@ -196,14 +198,22 @@ async function bootstrap() {
     return;
   }
 
+  const warmUser = readWarmUserCache(cachedUserId);
+  if (warmUser) {
+    await setCurrentUser(warmUser, { silent: true, refresh: false, persistWarmCache: false });
+  }
+
   const me = await getJson(`/api/users/${cachedUserId}`).catch(() => null);
   if (!me?.ok || !me.user) {
-    localStorage.removeItem("matcha_user_id");
-    openAuth();
+    if (!warmUser) {
+      localStorage.removeItem("matcha_user_id");
+      localStorage.removeItem("matcha_user_warm");
+      openAuth();
+    }
     return;
   }
 
-  await setCurrentUser(me.user);
+  await setCurrentUser(me.user, { silent: true });
   if (!isProfileComplete(me.user)) {
     openOnboarding();
   }
@@ -287,15 +297,18 @@ async function onCreateProfile(event) {
   const selectedGoal = String(relationshipGoalInput?.value || "").trim();
   if (!selectedInterests.length) {
     showToast("Selecciona al menos 1 interes");
+    setOnboardingSubmitting(false);
     return;
   }
   if (!selectedGoal) {
     showToast("Selecciona que tipo de relacion buscas");
+    setOnboardingSubmitting(false);
     return;
   }
   const selectedLiving = String(livingInInput?.value || onboardingForm.elements.namedItem("livingIn")?.value || "").trim();
   if (!selectedLiving) {
     showToast("Selecciona donde vives");
+    setOnboardingSubmitting(false);
     return;
   }
   let photoUrls = Array.isArray(state.onboardingPhotoUrls) ? state.onboardingPhotoUrls.slice(0, 5) : [];
@@ -379,14 +392,22 @@ async function onCreateProfile(event) {
   await setCurrentUser(created.user);
 }
 
-async function setCurrentUser(user) {
+async function setCurrentUser(user, options = {}) {
+  const { silent = false, refresh = true, persistWarmCache = true } = options;
   state.user = user;
   localStorage.setItem("matcha_user_id", user.id);
+  if (persistWarmCache) {
+    localStorage.setItem("matcha_user_warm", JSON.stringify(buildWarmUser(user)));
+  }
   notifyAndroidUser(user.id);
   setTab("swipe");
   renderProfile();
-  refreshAllData(true);
-  showToast(`Bienvenido ${user.name}`);
+  if (refresh) {
+    refreshAllData(true);
+  }
+  if (!silent) {
+    showToast(`Bienvenido ${user.name}`);
+  }
 }
 
 async function refreshAllData(force = false) {
@@ -888,6 +909,7 @@ function renderProfile() {
 
 function hardResetProfile() {
   localStorage.removeItem("matcha_user_id");
+  localStorage.removeItem("matcha_user_warm");
   window.location.reload();
 }
 
@@ -1520,6 +1542,34 @@ function isFetchStale(key, ttlMs) {
 
 function touchFetch(key) {
   state.lastFetchAt[key] = Date.now();
+}
+
+function buildWarmUser(user) {
+  const firstPhoto =
+    String(user?.photoUrl || "").trim() ||
+    (Array.isArray(user?.photoUrls) && user.photoUrls.length ? String(user.photoUrls[0] || "").trim() : "");
+  return {
+    id: String(user?.id || ""),
+    name: String(user?.name || ""),
+    age: Number(user?.age) || 0,
+    city: String(user?.city || ""),
+    bio: String(user?.bio || ""),
+    photoUrl: firstPhoto,
+    photoUrls: firstPhoto ? [firstPhoto] : [],
+    showAge: user?.showAge !== false,
+  };
+}
+
+function readWarmUserCache(expectedUserId) {
+  try {
+    const raw = localStorage.getItem("matcha_user_warm");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.id !== expectedUserId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function sleep(ms) {
