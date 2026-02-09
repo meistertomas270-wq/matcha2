@@ -16,6 +16,7 @@ const state = {
   activeChatMessages: [],
   swiping: false,
   loading: {
+    auth: false,
     stack: false,
     likes: false,
     chats: false,
@@ -73,6 +74,7 @@ const authDialog = document.getElementById("authDialog");
 const btnAuthLoginTab = document.getElementById("btnAuthLoginTab");
 const btnAuthRegisterTab = document.getElementById("btnAuthRegisterTab");
 const loginForm = document.getElementById("loginForm");
+const loginSubmitBtn = loginForm?.querySelector('button[type="submit"]');
 const registerForm = document.getElementById("registerForm");
 const registerPassword = document.getElementById("registerPassword");
 const registerPasswordConfirm = document.getElementById("registerPasswordConfirm");
@@ -915,22 +917,33 @@ function hardResetProfile() {
 
 async function onLoginSubmit(event) {
   event.preventDefault();
+  if (state.loading.auth) return;
+  state.loading.auth = true;
+  setAuthSubmitting(true);
   const formData = new FormData(loginForm);
   const payload = {
     email: String(formData.get("email") || ""),
     password: String(formData.get("password") || ""),
   };
 
-  const response = await postJson("/api/auth/login", payload).catch((err) => ({ ok: false, error: err?.message || "" }));
-  if (!response?.ok || !response.user) {
-    showToast(response?.error || "Email o contrasena invalidos");
-    return;
-  }
+  try {
+    const response = await postJson("/api/auth/login", payload).catch((err) => ({
+      ok: false,
+      error: err?.message || "",
+    }));
+    if (!response?.ok || !response.user) {
+      showToast(response?.error || "Email o contrasena invalidos");
+      return;
+    }
 
-  closeDialog(authDialog);
-  await setCurrentUser(response.user);
-  if (!response.profileComplete || !isProfileComplete(response.user)) {
-    openOnboarding();
+    closeDialog(authDialog);
+    await setCurrentUser(response.user);
+    if (!response.profileComplete || !isProfileComplete(response.user)) {
+      openOnboarding();
+    }
+  } finally {
+    state.loading.auth = false;
+    setAuthSubmitting(false);
   }
 }
 
@@ -1490,7 +1503,7 @@ function formatTimeAgo(isoDate) {
 }
 
 async function getJson(url) {
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url, undefined, 12000);
   if (!response.ok) {
     throw new Error(`GET ${url} failed ${response.status}`);
   }
@@ -1498,11 +1511,15 @@ async function getJson(url) {
 }
 
 async function postJson(url, data) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(
+    url,
+    {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
-  });
+    },
+    12000
+  );
   let body = null;
   try {
     body = await response.json();
@@ -1513,6 +1530,25 @@ async function postJson(url, data) {
     throw new Error(body?.error || `POST ${url} failed ${response.status}`);
   }
   return body || { ok: true };
+}
+
+function fetchWithTimeout(url, options, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...(options || {}), signal: controller.signal })
+    .catch((err) => {
+      if (err?.name === "AbortError") {
+        throw new Error("Tiempo de espera agotado. Revisa tu conexion.");
+      }
+      throw err;
+    })
+    .finally(() => clearTimeout(timer));
+}
+
+function setAuthSubmitting(isSubmitting) {
+  if (!loginSubmitBtn) return;
+  loginSubmitBtn.disabled = isSubmitting;
+  loginSubmitBtn.textContent = isSubmitting ? "Entrando..." : "Entrar";
 }
 
 function urlBase64ToUint8Array(base64String) {
