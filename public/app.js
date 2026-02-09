@@ -59,10 +59,16 @@ const profileAvatarEl = document.getElementById("profileAvatar");
 const profileNameEl = document.getElementById("profileName");
 const profileBioEl = document.getElementById("profileBio");
 const profileExtraEl = document.getElementById("profileExtra");
+const profileBadgeEl = document.getElementById("profileBadge");
+const profileCompletionEl = document.getElementById("profileCompletion");
+const perkSuperlikesEl = document.getElementById("perkSuperlikes");
+const perkBoostsEl = document.getElementById("perkBoosts");
+const perkLikesEl = document.getElementById("perkLikes");
 const statLikesEl = document.getElementById("statLikes");
 const statMatchesEl = document.getElementById("statMatches");
 const statChatsEl = document.getElementById("statChats");
 const btnEditProfile = document.getElementById("btnEditProfile");
+const btnPreviewProfile = document.getElementById("btnPreviewProfile");
 
 const btnNotif = document.getElementById("btnNotif");
 const btnReset = document.getElementById("btnReset");
@@ -117,6 +123,12 @@ const chatMessagesEl = document.getElementById("chatMessages");
 const btnCloseChat = document.getElementById("btnCloseChat");
 const chatComposer = document.getElementById("chatComposer");
 const chatInput = document.getElementById("chatInput");
+const profilePreviewDialog = document.getElementById("profilePreviewDialog");
+const profilePreviewCard = document.getElementById("profilePreviewCard");
+const btnCloseProfilePreview = document.getElementById("btnCloseProfilePreview");
+const swipeProfileDialog = document.getElementById("swipeProfileDialog");
+const swipeProfileCard = document.getElementById("swipeProfileCard");
+const btnCloseSwipeProfile = document.getElementById("btnCloseSwipeProfile");
 
 const toastEl = document.getElementById("toast");
 
@@ -273,9 +285,8 @@ function bindEvents() {
     renderChats();
   });
 
-  btnEditProfile.addEventListener("click", () =>
-    showToast("Usa 'Cambiar perfil' para recrear tu cuenta")
-  );
+  btnEditProfile.addEventListener("click", openOnboarding);
+  btnPreviewProfile?.addEventListener("click", openProfilePreview);
 
   btnNotif.addEventListener("click", enableNotifications);
   btnNotifProfile.addEventListener("click", enableNotifications);
@@ -285,6 +296,8 @@ function bindEvents() {
   btnLogoutProfile?.addEventListener("click", hardResetProfile);
 
   btnCloseChat.addEventListener("click", closeChatDialog);
+  btnCloseProfilePreview?.addEventListener("click", closeProfilePreview);
+  btnCloseSwipeProfile?.addEventListener("click", closeSwipeProfile);
   chatComposer.addEventListener("submit", onSendChatMessage);
 
   dobInput?.addEventListener("change", syncBirthData);
@@ -513,7 +526,13 @@ function setTab(tab) {
   state.tab = tab;
 
   navButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.tabBtn === tab);
+    const isActive = button.dataset.tabBtn === tab;
+    button.classList.toggle("active", isActive);
+    if (isActive) {
+      button.setAttribute("aria-current", "page");
+    } else {
+      button.removeAttribute("aria-current");
+    }
   });
   tabViews.forEach((view) => {
     view.classList.toggle("active", view.dataset.tabView === tab);
@@ -586,7 +605,11 @@ function createSwipeCard(profile, isTop, index) {
   const card = document.createElement("article");
   card.className = "card";
   card.dataset.userId = profile.id;
-  card.style.backgroundImage = `url("${escapeHtml(getPrimaryPhoto(profile))}")`;
+  const photos = getSwipePhotos(profile);
+  card._profile = profile;
+  card._photos = photos;
+  card._photoIndex = 0;
+  card.style.backgroundImage = `url("${escapeHtml(photos[0] || getPrimaryPhoto(profile))}")`;
   card.style.transform = `scale(${1 - index * 0.035}) translateY(${index * 8}px)`;
   card.style.zIndex = String(20 - index);
 
@@ -597,19 +620,32 @@ function createSwipeCard(profile, isTop, index) {
   const relationship = String(profile.relationshipGoal || "").trim();
   const subtitleParts = [profile.city || "Sin ciudad"];
   if (relationship) subtitleParts.push(relationship);
+  const photoSteps = photos
+    .map((_, photoIndex) => `<span class="photo-step ${photoIndex === 0 ? "active" : ""}"></span>`)
+    .join("");
   card.innerHTML = `
+    <div class="card-photo-steps">${photoSteps}</div>
     <div class="swipe-tint pass"></div>
     <div class="swipe-tint like"></div>
-    <div class="stamp pass">NOPE</div>
-    <div class="stamp like">LIKE</div>
+    <div class="stamp pass">✕</div>
+    <div class="stamp like">❤</div>
     <div class="card-meta">
       <h3 class="card-title">${escapeHtml(profile.name)}, ${Number(profile.age) || 0}</h3>
       <p class="card-subtitle">${escapeHtml(subtitleParts.join(" · "))}</p>
       <div class="card-tags">
         ${tags.map((tag) => `<span class="card-tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
+      <button class="card-expand" type="button" aria-label="Ver perfil completo">⌄</button>
     </div>
   `;
+
+  const expandBtn = card.querySelector(".card-expand");
+  expandBtn?.addEventListener("pointerdown", (event) => event.stopPropagation());
+  expandBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openSwipeProfile(profile);
+  });
 
   if (isTop) {
     attachDrag(card);
@@ -620,19 +656,23 @@ function createSwipeCard(profile, isTop, index) {
 function attachDrag(card) {
   let dragging = false;
   let startX = 0;
+  let startY = 0;
   let deltaX = 0;
+  let deltaY = 0;
   let vibratedDirection = "";
 
   card.addEventListener("pointerdown", (event) => {
     if (state.swiping) return;
     dragging = true;
     startX = event.clientX;
+    startY = event.clientY;
     card.setPointerCapture(event.pointerId);
   });
 
   card.addEventListener("pointermove", (event) => {
     if (!dragging || state.swiping) return;
     deltaX = event.clientX - startX;
+    deltaY = event.clientY - startY;
     const rotate = deltaX * 0.05;
     card.style.transition = "none";
     card.style.transform = `translateX(${deltaX}px) rotate(${rotate}deg)`;
@@ -659,10 +699,15 @@ function attachDrag(card) {
       await swipeTopCard("pass");
       return;
     }
+    const wasTap = Math.abs(deltaX) < 14 && Math.abs(deltaY) < 14;
+    if (wasTap) {
+      cycleCardPhoto(card, startX);
+    }
     card.style.transition = "transform 0.2s ease";
     card.style.transform = "";
     paintStamps(card, 0);
     deltaX = 0;
+    deltaY = 0;
   };
 
   card.addEventListener("pointerup", release);
@@ -871,6 +916,30 @@ function closeChatDialog() {
   state.activeChatMessages = [];
 }
 
+function openProfilePreview() {
+  if (!state.user || !profilePreviewCard) return;
+  profilePreviewCard.innerHTML = buildPublicProfilePreview(state.user);
+  openDialog(profilePreviewDialog);
+}
+
+function closeProfilePreview() {
+  closeDialog(profilePreviewDialog);
+}
+
+async function openSwipeProfile(profile) {
+  if (!profile || !swipeProfileCard) return;
+  swipeProfileCard.innerHTML = `<div class="empty-state">Cargando perfil...</div>`;
+  openDialog(swipeProfileDialog);
+  const full = await getJson(`/api/users/${encodeURIComponent(profile.id)}`)
+    .then((res) => (res?.ok ? res.user : null))
+    .catch(() => null);
+  swipeProfileCard.innerHTML = buildPublicProfilePreview(full || profile);
+}
+
+function closeSwipeProfile() {
+  closeDialog(swipeProfileDialog);
+}
+
 function renderChatMessages() {
   if (!state.activeChatMessages.length) {
     chatMessagesEl.innerHTML = `<div class="empty-state">Sin mensajes todavia</div>`;
@@ -931,12 +1000,26 @@ function renderProfile() {
   profileAvatarEl.src = getPrimaryPhoto(state.user);
   const safeAge = Number(state.user.age) || 0;
   profileNameEl.textContent = state.user.showAge ? `${state.user.name}, ${safeAge}` : state.user.name;
-  profileBioEl.textContent = `${state.user.bio || "Sin bio"} - ${state.user.city || "Sin ciudad"}`;
+  profileBioEl.textContent = state.user.city || "Sin ciudad";
   profileExtraEl.innerHTML = buildProfileFacts(state.user);
+  const completion = getProfileCompletionPercent(state.user);
+  if (profileBadgeEl) profileBadgeEl.textContent = `${completion}%`;
+  if (profileCompletionEl) profileCompletionEl.textContent = `${completion}%`;
 
   statLikesEl.textContent = String(state.likesSummary.likesReceived || 0);
   statMatchesEl.textContent = String(state.likesSummary.matchesCount || state.matches.length || 0);
   statChatsEl.textContent = String(state.chats.length || 0);
+  if (perkLikesEl) {
+    perkLikesEl.textContent = String(state.likesSummary.likesReceived || 0);
+  }
+  if (perkSuperlikesEl) {
+    const remaining = Math.max(0, 5 - ((state.matches.length || 0) % 5));
+    perkSuperlikesEl.textContent = String(remaining);
+  }
+  if (perkBoostsEl) {
+    const boost = Math.max(0, 2 - ((state.likesSummary.likesReceived || 0) % 2));
+    perkBoostsEl.textContent = String(boost);
+  }
 }
 
 function hardResetProfile() {
@@ -1196,6 +1279,46 @@ function buildProfileFacts(user) {
     return '<div class="profile-fact">Completa tu perfil para mejorar tus matches</div>';
   }
   return items.join("");
+}
+
+function buildPublicProfilePreview(user) {
+  const ageText = user.showAge === false ? "" : `, ${Number(user.age) || 0}`;
+  const mainLine = `${user.name || "Perfil"}${ageText}`;
+  const subLine = user.city || user.livingIn || "Sin ciudad";
+  const bio = String(user.bio || "").trim() || "Sin bio";
+  const interests = Array.isArray(user.interests) ? user.interests.slice(0, 6) : [];
+  return `
+    <div class="preview-hero" style="background-image:url('${escapeHtml(getPrimaryPhoto(user))}')">
+      <div class="preview-overlay">
+        <h3>${escapeHtml(mainLine)}</h3>
+        <p>${escapeHtml(subLine)}</p>
+      </div>
+    </div>
+    <div class="preview-body">
+      <p class="preview-bio">${escapeHtml(bio)}</p>
+      <div class="preview-chips">
+        ${interests.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+      <div class="preview-facts">${buildProfileFacts(user)}</div>
+    </div>
+  `;
+}
+
+function getProfileCompletionPercent(user) {
+  const checks = [
+    String(user?.name || "").trim().length >= 2,
+    String(user?.bio || "").trim().length >= 10,
+    String(user?.city || user?.livingIn || "").trim().length > 0,
+    String(user?.relationshipGoal || "").trim().length > 0,
+    Array.isArray(user?.interests) && user.interests.length > 0,
+    String(user?.gender || "").trim().length > 0,
+    (Array.isArray(user?.photoUrls) && user.photoUrls.length > 0) || String(user?.photoUrl || "").trim().length > 0,
+    Array.isArray(user?.languages) && user.languages.length > 0,
+    String(user?.education || "").trim().length > 0,
+    String(user?.workout || "").trim().length > 0,
+  ];
+  const completed = checks.filter(Boolean).length;
+  return Math.round((completed / checks.length) * 100);
 }
 
 function pushProfileFact(items, label, value) {
@@ -1508,6 +1631,33 @@ function getPrimaryPhoto(profile) {
     return profile.photoUrls[0];
   }
   return profile?.photoUrl || buildFallbackPhoto(profile?.id || "fallback");
+}
+
+function getSwipePhotos(profile) {
+  if (Array.isArray(profile?.photoThumbUrls) && profile.photoThumbUrls.length) {
+    return profile.photoThumbUrls.slice(0, 6);
+  }
+  if (Array.isArray(profile?.photoUrls) && profile.photoUrls.length) {
+    return profile.photoUrls.slice(0, 6);
+  }
+  return [getPrimaryPhoto(profile)];
+}
+
+function cycleCardPhoto(card, pointerX) {
+  const photos = Array.isArray(card?._photos) ? card._photos : [];
+  if (!photos.length) return;
+  const rect = card.getBoundingClientRect();
+  const goPrevious = pointerX < rect.left + rect.width * 0.42;
+  if (goPrevious) {
+    card._photoIndex = (card._photoIndex - 1 + photos.length) % photos.length;
+  } else {
+    card._photoIndex = (card._photoIndex + 1) % photos.length;
+  }
+  const nextPhoto = photos[card._photoIndex] || photos[0];
+  card.style.backgroundImage = `url("${escapeHtml(nextPhoto)}")`;
+  card.querySelectorAll(".photo-step").forEach((dot, dotIndex) => {
+    dot.classList.toggle("active", dotIndex === card._photoIndex);
+  });
 }
 
 function setOnboardingSubmitting(isSubmitting) {

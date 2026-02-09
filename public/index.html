@@ -89,23 +89,66 @@
         </section>
 
         <section class="tab-view" data-tab-view="profile">
-          <article class="profile-card">
-            <div class="profile-top">
+          <article class="profile-v2-header">
+            <div class="profile-identity">
               <img id="profileAvatar" class="profile-avatar" alt="Avatar" />
-              <div>
+              <div class="profile-identity-main">
                 <h2 id="profileName" class="profile-name">Perfil</h2>
                 <p id="profileBio" class="profile-bio"></p>
-                <div id="profileExtra" class="profile-extra"></div>
-                <button id="btnEditProfile" class="edit-profile-btn" type="button">Editar perfil</button>
               </div>
+              <span id="profileBadge" class="profile-badge">0%</span>
+            </div>
+            <div class="profile-cta-row">
+              <button id="btnEditProfile" class="edit-profile-btn" type="button">Editar perfil</button>
+              <button id="btnPreviewProfile" class="edit-profile-btn ghost" type="button">Ver como otro usuario</button>
             </div>
           </article>
 
-          <div class="profile-stats">
-            <article class="stat-card">
-              <h4>Likes</h4>
-              <p id="statLikes">0</p>
+          <article class="profile-teaser-card">
+            <div>
+              <h4>Prueba Double Date</h4>
+              <p>Invita a tus amigos y encuentra otro duo.</p>
+            </div>
+            <span class="teaser-chevron">›</span>
+          </article>
+
+          <div class="perks-grid">
+            <article class="perk-card">
+              <h5>Super Likes</h5>
+              <p id="perkSuperlikes">0</p>
+              <small>Disponibles</small>
             </article>
+            <article class="perk-card">
+              <h5>Boosts</h5>
+              <p id="perkBoosts">0</p>
+              <small>En espera</small>
+            </article>
+            <article class="perk-card">
+              <h5>Likes</h5>
+              <p id="perkLikes">0</p>
+              <small>Recibidos</small>
+            </article>
+          </div>
+
+          <article class="premium-card premium-card-v2">
+            <div class="premium-top">
+              <h3>Matcha Gold</h3>
+              <button type="button" class="premium-btn">Actualizar</button>
+            </div>
+            <p>Ve quien te dio like y desbloquea top picks sin blur.</p>
+            <ul class="premium-list">
+              <li>Descubre quien te dio Like</li>
+              <li>Top Picks diarios</li>
+              <li>Super Likes gratis</li>
+            </ul>
+          </article>
+
+          <details class="profile-more">
+            <summary>Mas sobre tu perfil</summary>
+            <div id="profileExtra" class="profile-extra"></div>
+          </details>
+
+          <div class="profile-stats compact">
             <article class="stat-card">
               <h4>Matches</h4>
               <p id="statMatches">0</p>
@@ -114,13 +157,15 @@
               <h4>Chats</h4>
               <p id="statChats">0</p>
             </article>
+            <article class="stat-card">
+              <h4>Completado</h4>
+              <p id="profileCompletion">0%</p>
+            </article>
+            <article class="stat-card hidden">
+              <h4>Likes</h4>
+              <p id="statLikes">0</p>
+            </article>
           </div>
-
-          <article class="premium-card">
-            <h3>Matcha Plus</h3>
-            <p>Ve quien te dio like y desbloquea top picks sin blur.</p>
-            <button type="button" class="premium-btn">Actualizar</button>
-          </article>
 
           <div class="profile-actions">
             <button id="btnNotifProfile" class="settings-btn" type="button">Activar notificaciones</button>
@@ -511,6 +556,32 @@
         <input id="chatInput" maxlength="600" placeholder="Escribe un mensaje..." />
         <button type="submit">Enviar</button>
       </form>
+    </div>
+  </dialog>
+
+  <dialog id="profilePreviewDialog" class="chat-modal">
+    <div class="chat-modal-shell preview-shell">
+      <header class="chat-modal-header">
+        <div>
+          <h3>Asi te ve otra persona</h3>
+          <p>Preview publico de tu perfil</p>
+        </div>
+        <button id="btnCloseProfilePreview" class="icon-btn ghost" type="button">Cerrar</button>
+      </header>
+      <article id="profilePreviewCard" class="preview-card"></article>
+    </div>
+  </dialog>
+
+  <dialog id="swipeProfileDialog" class="chat-modal">
+    <div class="chat-modal-shell preview-shell">
+      <header class="chat-modal-header">
+        <div>
+          <h3>Perfil completo</h3>
+          <p>Asi se ve este perfil</p>
+        </div>
+        <button id="btnCloseSwipeProfile" class="icon-btn ghost" type="button">Cerrar</button>
+      </header>
+      <article id="swipeProfileCard" class="preview-card"></article>
     </div>
   </dialog>
 

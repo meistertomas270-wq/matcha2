@@ -1434,6 +1434,7 @@ function buildSwipeCardSelect(alias = "") {
     ${p}city,
     ${p}bio,
     COALESCE(${p}photo_thumb_urls[1], ${p}photo_url) AS "photoUrl",
+    COALESCE(${p}photo_thumb_urls, ARRAY[${p}photo_url]) AS "photoThumbUrls",
     ${p}interests,
     ${p}relationship_goal AS "relationshipGoal"
   `;
