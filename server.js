@@ -155,12 +155,24 @@ app.post("/api/auth/register", async (req, res) => {
     const { rows } = await pool.query(
       `
       INSERT INTO users (
-        id, name, age, city, bio, photo_url, photo_urls, email, password_salt, password_hash, created_at
+        id, name, age, city, bio, photo_url, photo_urls, photo_thumb_urls, email, password_salt, password_hash, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, $9, $10, NOW())
-      RETURNING ${buildUserSelect("")}
+      VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, NOW())
+      RETURNING ${buildSessionUserSelect("")}
       `,
-      [userId, defaultName, 25, "Sin ciudad", "", defaultPhoto, [defaultPhoto], email, salt, hash]
+      [
+        userId,
+        defaultName,
+        25,
+        "Sin ciudad",
+        "",
+        defaultPhoto,
+        [defaultPhoto],
+        [defaultPhoto],
+        email,
+        salt,
+        hash,
+      ]
     );
 
     return res.json({
@@ -185,7 +197,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      SELECT ${buildUserSelect("")}, password_salt AS "passwordSalt", password_hash AS "passwordHash"
+      SELECT ${buildSessionUserSelect("")}, password_salt AS "passwordSalt", password_hash AS "passwordHash"
       FROM users
       WHERE LOWER(email) = LOWER($1)
       LIMIT 1
@@ -242,6 +254,7 @@ app.post("/api/auth/guest", async (req, res) => {
       profile.photoUrls[0] ||
         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
       profile.photoUrls,
+      profile.photoThumbUrls,
       profile.smartPhotosEnabled,
       profile.aboutPromptQuestion,
       profile.aboutPromptAnswer,
@@ -280,20 +293,20 @@ app.post("/api/auth/guest", async (req, res) => {
     const { rows } = await pool.query(
       `
       INSERT INTO users (
-        id, name, age, city, bio, photo_url, photo_urls, smart_photos_enabled, about_prompt_question,
+        id, name, age, city, bio, photo_url, photo_urls, photo_thumb_urls, smart_photos_enabled, about_prompt_question,
         about_prompt_answer, interests, relationship_goal, politics, pronouns, height_cm, languages,
         zodiac_sign, show_zodiac, dob, education, family_plans, love_style, pets, drinking, smoking, workout,
         social_media, ask_me_1, ask_me_2, ask_me_3, job_title, company, school, living_in,
         anthem, spotify_artists, gender, sexual_orientation, show_age, show_distance, created_at
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9,
-        $10, $11, $12, $13, $14, $15, $16,
-        $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-        $27, $28, $29, $30, $31, $32, $33, $34,
-        $35, $36, $37, $38, $39, $40, NOW()
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17,
+        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
+        $28, $29, $30, $31, $32, $33, $34, $35,
+        $36, $37, $38, $39, $40, $41, NOW()
       )
-      RETURNING ${buildUserSelect("")}
+      RETURNING ${buildSessionUserSelect("")}
       `,
       values
     );
@@ -317,7 +330,7 @@ app.post("/api/users/:userId/profile", async (req, res) => {
     }
 
     const current = await pool.query(
-      `SELECT ${buildUserSelect("")} FROM users WHERE id = $1 LIMIT 1`,
+      `SELECT ${buildSessionUserSelect("")} FROM users WHERE id = $1 LIMIT 1`,
       [userId]
     );
     if (!current.rowCount) {
@@ -345,41 +358,42 @@ app.post("/api/users/:userId/profile", async (req, res) => {
         bio = $5,
         photo_url = $6,
         photo_urls = $7,
-        smart_photos_enabled = $8,
-        about_prompt_question = $9,
-        about_prompt_answer = $10,
-        interests = $11,
-        relationship_goal = $12,
-        politics = $13,
-        pronouns = $14,
-        height_cm = $15,
-        languages = $16,
-        zodiac_sign = $17,
-        show_zodiac = $18,
-        dob = $19,
-        education = $20,
-        family_plans = $21,
-        love_style = $22,
-        pets = $23,
-        drinking = $24,
-        smoking = $25,
-        workout = $26,
-        social_media = $27,
-        ask_me_1 = $28,
-        ask_me_2 = $29,
-        ask_me_3 = $30,
-        job_title = $31,
-        company = $32,
-        school = $33,
-        living_in = $34,
-        anthem = $35,
-        spotify_artists = $36,
-        gender = $37,
-        sexual_orientation = $38,
-        show_age = $39,
-        show_distance = $40
+        photo_thumb_urls = $8,
+        smart_photos_enabled = $9,
+        about_prompt_question = $10,
+        about_prompt_answer = $11,
+        interests = $12,
+        relationship_goal = $13,
+        politics = $14,
+        pronouns = $15,
+        height_cm = $16,
+        languages = $17,
+        zodiac_sign = $18,
+        show_zodiac = $19,
+        dob = $20,
+        education = $21,
+        family_plans = $22,
+        love_style = $23,
+        pets = $24,
+        drinking = $25,
+        smoking = $26,
+        workout = $27,
+        social_media = $28,
+        ask_me_1 = $29,
+        ask_me_2 = $30,
+        ask_me_3 = $31,
+        job_title = $32,
+        company = $33,
+        school = $34,
+        living_in = $35,
+        anthem = $36,
+        spotify_artists = $37,
+        gender = $38,
+        sexual_orientation = $39,
+        show_age = $40,
+        show_distance = $41
       WHERE id = $1
-      RETURNING ${buildUserSelect("")}
+      RETURNING ${buildSessionUserSelect("")}
       `,
       [
         userId,
@@ -389,6 +403,7 @@ app.post("/api/users/:userId/profile", async (req, res) => {
         profile.bio,
         profile.photoUrls[0] || previous.photoUrl,
         profile.photoUrls,
+        profile.photoThumbUrls.length ? profile.photoThumbUrls : profile.photoUrls,
         profile.smartPhotosEnabled,
         profile.aboutPromptQuestion,
         profile.aboutPromptAnswer,
@@ -436,7 +451,7 @@ app.get("/api/users/:userId", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `
-      SELECT ${buildUserSelect("")}
+      SELECT ${buildSessionUserSelect("")}
       FROM users
       WHERE id = $1
       `,
@@ -607,7 +622,7 @@ app.get("/api/matches", async (req, res) => {
         u.age,
         u.city,
         u.bio,
-        u.photo_url
+        COALESCE(u.photo_thumb_urls[1], u.photo_url) AS photo_url
       FROM matches m
       JOIN users u
         ON u.id = CASE WHEN m.user_a = $1 THEN m.user_b ELSE m.user_a END
@@ -660,7 +675,7 @@ app.get("/api/likes/summary", async (req, res) => {
 
     const previewProfilesRes = await pool.query(
       `
-      SELECT u.id, u.name, u.age, u.city, u.photo_url AS "photoUrl"
+      SELECT u.id, u.name, u.age, u.city, COALESCE(u.photo_thumb_urls[1], u.photo_url) AS "photoUrl"
       FROM swipes s
       JOIN users u ON u.id = s.user_id
       LEFT JOIN matches m
@@ -679,7 +694,7 @@ app.get("/api/likes/summary", async (req, res) => {
 
     const topPicksRes = await pool.query(
       `
-      SELECT id, name, age, city, photo_url AS "photoUrl"
+      SELECT id, name, age, city, COALESCE(photo_thumb_urls[1], photo_url) AS "photoUrl"
       FROM users
       WHERE id <> $1
       ORDER BY created_at DESC
@@ -726,7 +741,7 @@ app.get("/api/chats", async (req, res) => {
         u.name,
         u.age,
         u.city,
-        u.photo_url AS photo_url,
+        COALESCE(u.photo_thumb_urls[1], u.photo_url) AS photo_url,
         lm.body AS last_message,
         lm.sender_id AS last_sender_id,
         lm.created_at AS last_message_at
@@ -970,6 +985,7 @@ async function initDb() {
         bio TEXT NOT NULL,
         photo_url TEXT NOT NULL,
         photo_urls TEXT[] NOT NULL DEFAULT '{}',
+        photo_thumb_urls TEXT[] NOT NULL DEFAULT '{}',
         smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
         about_prompt_question TEXT,
         about_prompt_answer TEXT,
@@ -1013,6 +1029,7 @@ async function initDb() {
       ADD COLUMN IF NOT EXISTS password_salt TEXT,
       ADD COLUMN IF NOT EXISTS password_hash TEXT,
       ADD COLUMN IF NOT EXISTS photo_urls TEXT[] NOT NULL DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS photo_thumb_urls TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS smart_photos_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS about_prompt_question TEXT,
       ADD COLUMN IF NOT EXISTS about_prompt_answer TEXT,
@@ -1059,6 +1076,13 @@ async function initDb() {
       SET photo_urls = ARRAY[photo_url]
       WHERE (photo_urls IS NULL OR array_length(photo_urls, 1) IS NULL)
         AND photo_url IS NOT NULL
+    `);
+
+    await client.query(`
+      UPDATE users
+      SET photo_thumb_urls = photo_urls
+      WHERE photo_thumb_urls IS NULL
+        OR array_length(photo_thumb_urls, 1) IS NULL
     `);
 
     await client.query(`
@@ -1145,10 +1169,10 @@ async function initDb() {
       for (const u of defaultUsers) {
         await client.query(
           `
-          INSERT INTO users (id, name, age, city, bio, photo_url, photo_urls, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          INSERT INTO users (id, name, age, city, bio, photo_url, photo_urls, photo_thumb_urls, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
           `,
-          [u.id, u.name, u.age, u.city, u.bio, u.photoUrl, [u.photoUrl]]
+          [u.id, u.name, u.age, u.city, u.bio, u.photoUrl, [u.photoUrl], [u.photoUrl]]
         );
       }
     }
@@ -1342,6 +1366,10 @@ async function seedChatOnNewMatch(client, matchId, userAId, userBId) {
   );
 }
 
+function buildSessionUserSelect(alias = "") {
+  return buildUserSelect(alias);
+}
+
 function buildUserSelect(alias = "") {
   const p = alias ? `${alias}.` : "";
   return `
@@ -1353,6 +1381,7 @@ function buildUserSelect(alias = "") {
     ${p}bio,
     ${p}photo_url AS "photoUrl",
     ${p}photo_urls AS "photoUrls",
+    ${p}photo_thumb_urls AS "photoThumbUrls",
     ${p}smart_photos_enabled AS "smartPhotosEnabled",
     ${p}about_prompt_question AS "aboutPromptQuestion",
     ${p}about_prompt_answer AS "aboutPromptAnswer",
@@ -1407,6 +1436,7 @@ function buildSwipeCardSelect(alias = "") {
 function normalizeExtendedProfile(raw) {
   const city = normalizeText(raw.city || raw.livingIn, 80) || "Sin ciudad";
   const photoUrls = normalizePhotoList(raw.photoUrls, 5);
+  const photoThumbUrls = normalizePhotoList(raw.photoThumbUrls, 5);
   const dob = normalizeDateOnly(raw.dob);
   const politics = normalizeEnum(raw.politics, ["derecha", "izquierda"], "derecha");
   const zodiacFromDob = dob ? zodiacSignFromDate(dob) : "";
@@ -1415,6 +1445,7 @@ function normalizeExtendedProfile(raw) {
     city,
     bio: normalizeText(raw.bio, 180),
     photoUrls,
+    photoThumbUrls: photoThumbUrls.length ? photoThumbUrls : photoUrls,
     smartPhotosEnabled: normalizeBoolean(raw.smartPhotosEnabled, true),
     aboutPromptQuestion: normalizeText(raw.aboutPromptQuestion, 80),
     aboutPromptAnswer: normalizeText(raw.aboutPromptAnswer, 140),
