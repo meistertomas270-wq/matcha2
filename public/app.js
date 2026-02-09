@@ -450,7 +450,7 @@ async function refreshStack(force = false) {
   state.loading.stack = true;
   renderSwipeDeck();
   const response = await getJson(
-    `/api/profiles/stack?userId=${encodeURIComponent(state.user.id)}&limit=18`
+    `/api/profiles/stack?userId=${encodeURIComponent(state.user.id)}&limit=3`
   ).catch(() => null);
   state.stack = response?.ok && Array.isArray(response.profiles) ? response.profiles : [];
   state.loading.stack = false;
@@ -1549,7 +1549,7 @@ function fileToDataUrl(file) {
       const src = String(reader.result || "");
       const image = new Image();
       image.onload = () => {
-        const maxSize = 1280;
+        const maxSize = 720;
         const ratio = Math.min(1, maxSize / image.width, maxSize / image.height);
         const w = Math.max(1, Math.round(image.width * ratio));
         const h = Math.max(1, Math.round(image.height * ratio));

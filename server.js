@@ -476,7 +476,7 @@ app.get("/api/users/:userId", async (req, res) => {
 app.get("/api/profiles/stack", async (req, res) => {
   try {
     const userId = String(req.query.userId || "");
-    const limit = Math.max(1, Math.min(20, Number(req.query.limit) || 8));
+    const limit = Math.max(1, Math.min(3, Number(req.query.limit) || 3));
     if (!userId) {
       return res.status(400).json({ ok: false, error: "userId_required" });
     }
