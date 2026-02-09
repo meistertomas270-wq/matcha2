@@ -108,6 +108,12 @@ app.use(
     setHeaders(res, filePath) {
       if (filePath.endsWith(".html")) {
         res.setHeader("Cache-Control", "no-cache");
+      } else if (
+        filePath.endsWith(".js") ||
+        filePath.endsWith(".css") ||
+        filePath.endsWith("/sw.js")
+      ) {
+        res.setHeader("Cache-Control", "no-cache");
       } else {
         res.setHeader("Cache-Control", "public, max-age=604800, immutable");
       }

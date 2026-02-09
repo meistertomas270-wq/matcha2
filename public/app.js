@@ -932,7 +932,7 @@ async function onLoginSubmit(event) {
       error: err?.message || "",
     }));
     if (!response?.ok || !response.user) {
-      showToast(response?.error || "Email o contrasena invalidos");
+      showToast(mapAuthError(response?.error));
       return;
     }
 
@@ -1549,6 +1549,15 @@ function setAuthSubmitting(isSubmitting) {
   if (!loginSubmitBtn) return;
   loginSubmitBtn.disabled = isSubmitting;
   loginSubmitBtn.textContent = isSubmitting ? "Entrando..." : "Entrar";
+}
+
+function mapAuthError(error) {
+  const code = String(error || "").trim().toLowerCase();
+  if (!code) return "No se pudo iniciar sesion";
+  if (code.includes("invalid_credentials")) return "Email o contrasena incorrectos";
+  if (code.includes("credentials_required")) return "Completa email y contrasena";
+  if (code.includes("tiempo de espera")) return "Sin respuesta del servidor. Intenta de nuevo";
+  return error;
 }
 
 function urlBase64ToUint8Array(base64String) {
