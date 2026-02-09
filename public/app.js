@@ -29,6 +29,7 @@ const state = {
     chats: 0,
   },
 };
+const preloadedPhotoUrls = new Set();
 
 const screenTitleEl = document.getElementById("screenTitle");
 const screenSubtitleEl = document.getElementById("screenSubtitle");
@@ -453,6 +454,7 @@ async function refreshStack(force = false) {
     `/api/profiles/stack?userId=${encodeURIComponent(state.user.id)}&limit=3`
   ).catch(() => null);
   state.stack = response?.ok && Array.isArray(response.profiles) ? response.profiles : [];
+  preloadDeckPhotos(state.stack);
   state.loading.stack = false;
   touchFetch("stack");
   renderSwipeDeck();
@@ -574,7 +576,7 @@ function renderExploreCatalog() {
 
 function renderSwipeDeck() {
   deckEl.innerHTML = "";
-  if (state.loading.stack) {
+  if (state.loading.stack && !state.stack.length) {
     deckEl.innerHTML = `
       <div class="skeleton card-skeleton"></div>
       <div class="skeleton card-skeleton secondary"></div>
@@ -596,6 +598,12 @@ function renderSwipeDeck() {
     const card = createSwipeCard(profile, i === 0, i);
     deckEl.appendChild(card);
   }
+  if (state.loading.stack && state.stack.length) {
+    const loader = document.createElement("div");
+    loader.className = "deck-inline-loader";
+    loader.innerHTML = `<div class="skeleton card-skeleton secondary"></div>`;
+    deckEl.appendChild(loader);
+  }
 
   swipeStatusEl.textContent = `${state.stack.length} perfiles en cola`;
   renderScreenMeta();
@@ -606,6 +614,7 @@ function createSwipeCard(profile, isTop, index) {
   card.className = "card";
   card.dataset.userId = profile.id;
   const photos = getSwipePhotos(profile);
+  preloadPhotoUrls(photos.slice(1));
   card._profile = profile;
   card._photos = photos;
   card._photoIndex = 0;
@@ -646,6 +655,10 @@ function createSwipeCard(profile, isTop, index) {
     event.stopPropagation();
     openSwipeProfile(profile);
   });
+  const likeStampEl = card.querySelector(".stamp.like");
+  const passStampEl = card.querySelector(".stamp.pass");
+  if (likeStampEl) likeStampEl.innerHTML = "&#10084;";
+  if (passStampEl) passStampEl.innerHTML = "&#10005;";
 
   if (isTop) {
     attachDrag(card);
@@ -719,8 +732,8 @@ function paintStamps(card, dx) {
   const passStamp = card.querySelector(".stamp.pass");
   const likeTint = card.querySelector(".swipe-tint.like");
   const passTint = card.querySelector(".swipe-tint.pass");
-  const likeProgress = Math.max(0, Math.min(1, dx / 140));
-  const passProgress = Math.max(0, Math.min(1, -dx / 140));
+  const likeProgress = Math.max(0, Math.min(1, dx / 95));
+  const passProgress = Math.max(0, Math.min(1, -dx / 95));
 
   likeStamp.style.opacity = String(likeProgress);
   passStamp.style.opacity = String(passProgress);
@@ -749,7 +762,7 @@ async function swipeTopCard(direction) {
 
   await sleep(220);
 
-  const response = await postJson("/api/swipes", {
+  const responsePromise = postJson("/api/swipes", {
     userId: state.user.id,
     targetId: target.id,
     direction: apiDirection,
@@ -760,17 +773,19 @@ async function swipeTopCard(direction) {
   swipeStatusEl.textContent =
     apiDirection === "like" ? "Te gusta este perfil" : "Perfil descartado";
 
+  if (state.stack.length < 2) {
+    refreshStack(true);
+  }
+  state.swiping = false;
+
+  const response = await responsePromise;
   if (response?.ok && response.isMatch) {
     const title = `Match con ${target.name}`;
     showToast(title);
     maybeBrowserNotify(title, "Abre Chat para hablar");
     notifyAndroidLocal(title, "Hay match en Matcha");
     await Promise.all([refreshMatches(true), refreshChats(true), refreshLikesSummary(true)]);
-  } else if (state.stack.length < 3) {
-    await refreshStack(true);
   }
-
-  state.swiping = false;
 }
 
 function renderLikes() {
@@ -1653,10 +1668,34 @@ function cycleCardPhoto(card, pointerX) {
   } else {
     card._photoIndex = (card._photoIndex + 1) % photos.length;
   }
+  const upcoming = photos[(card._photoIndex + 1) % photos.length];
+  if (upcoming) preloadPhotoUrls([upcoming]);
   const nextPhoto = photos[card._photoIndex] || photos[0];
   card.style.backgroundImage = `url("${escapeHtml(nextPhoto)}")`;
   card.querySelectorAll(".photo-step").forEach((dot, dotIndex) => {
     dot.classList.toggle("active", dotIndex === card._photoIndex);
+  });
+}
+
+function preloadDeckPhotos(profiles) {
+  if (!Array.isArray(profiles) || !profiles.length) return;
+  const urls = [];
+  profiles.slice(0, 3).forEach((profile) => {
+    urls.push(...getSwipePhotos(profile).slice(0, 3));
+  });
+  preloadPhotoUrls(urls);
+}
+
+function preloadPhotoUrls(urls) {
+  if (!Array.isArray(urls) || !urls.length) return;
+  urls.forEach((url) => {
+    const normalized = String(url || "").trim();
+    if (!normalized || preloadedPhotoUrls.has(normalized)) return;
+    preloadedPhotoUrls.add(normalized);
+    const image = new Image();
+    image.decoding = "async";
+    image.loading = "eager";
+    image.src = normalized;
   });
 }
 
