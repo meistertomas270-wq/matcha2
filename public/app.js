@@ -21,6 +21,12 @@ const state = {
     chats: false,
   },
   onboardingPhotoUrls: [],
+  lastFetchAt: {
+    stack: 0,
+    matches: 0,
+    likes: 0,
+    chats: 0,
+  },
 };
 
 const screenTitleEl = document.getElementById("screenTitle");
@@ -377,24 +383,25 @@ async function setCurrentUser(user) {
   state.user = user;
   localStorage.setItem("matcha_user_id", user.id);
   notifyAndroidUser(user.id);
-
-  await refreshAllData();
   setTab("swipe");
   renderProfile();
+  refreshAllData(true);
   showToast(`Bienvenido ${user.name}`);
 }
 
-async function refreshAllData() {
+async function refreshAllData(force = false) {
   await Promise.all([
-    refreshStack(),
-    refreshMatches(),
-    refreshLikesSummary(),
-    refreshChats(),
+    refreshStack(force),
+    refreshMatches(force),
+    refreshLikesSummary(force),
+    refreshChats(force),
   ]);
 }
 
-async function refreshStack() {
+async function refreshStack(force = false) {
   if (!state.user) return;
+  if (!force && !isFetchStale("stack", 8000) && state.stack.length) return;
+  if (state.loading.stack && !force) return;
   state.loading.stack = true;
   renderSwipeDeck();
   const response = await getJson(
@@ -402,22 +409,27 @@ async function refreshStack() {
   ).catch(() => null);
   state.stack = response?.ok && Array.isArray(response.profiles) ? response.profiles : [];
   state.loading.stack = false;
+  touchFetch("stack");
   renderSwipeDeck();
 }
 
-async function refreshMatches() {
+async function refreshMatches(force = false) {
   if (!state.user) return;
+  if (!force && !isFetchStale("matches", 8000) && state.matches.length) return;
   const response = await getJson(
     `/api/matches?userId=${encodeURIComponent(state.user.id)}`
   ).catch(() => null);
   state.matches = response?.ok && Array.isArray(response.matches) ? response.matches : [];
+  touchFetch("matches");
   renderChats();
   renderProfile();
   renderScreenMeta();
 }
 
-async function refreshLikesSummary() {
+async function refreshLikesSummary(force = false) {
   if (!state.user) return;
+  if (!force && !isFetchStale("likes", 10000) && state.likesSummary.likesReceived >= 0) return;
+  if (state.loading.likes && !force) return;
   state.loading.likes = true;
   renderLikes();
   const response = await getJson(
@@ -441,13 +453,16 @@ async function refreshLikesSummary() {
   }
 
   state.loading.likes = false;
+  touchFetch("likes");
   renderLikes();
   renderProfile();
   renderScreenMeta();
 }
 
-async function refreshChats() {
+async function refreshChats(force = false) {
   if (!state.user) return;
+  if (!force && !isFetchStale("chats", 7000) && state.chats.length) return;
+  if (state.loading.chats && !force) return;
   state.loading.chats = true;
   renderChats();
   const response = await getJson(
@@ -455,6 +470,7 @@ async function refreshChats() {
   ).catch(() => null);
   state.chats = response?.ok && Array.isArray(response.chats) ? response.chats : [];
   state.loading.chats = false;
+  touchFetch("chats");
   renderChats();
   renderProfile();
   renderScreenMeta();
@@ -473,13 +489,13 @@ function setTab(tab) {
   renderScreenMeta();
 
   if (tab === "likes") {
-    refreshLikesSummary();
+    refreshLikesSummary(false);
   }
   if (tab === "chat") {
-    refreshChats();
+    refreshChats(false);
   }
   if (tab === "swipe" && state.stack.length < 3) {
-    refreshStack();
+    refreshStack(false);
   }
 }
 
@@ -651,9 +667,9 @@ async function swipeTopCard(direction) {
     showToast(title);
     maybeBrowserNotify(title, "Abre Chat para hablar");
     notifyAndroidLocal(title, "Hay match en Matcha");
-    await Promise.all([refreshMatches(), refreshChats(), refreshLikesSummary()]);
+    await Promise.all([refreshMatches(true), refreshChats(true), refreshLikesSummary(true)]);
   } else if (state.stack.length < 3) {
-    await refreshStack();
+    await refreshStack(true);
   }
 
   state.swiping = false;
@@ -847,7 +863,7 @@ async function onSendChatMessage(event) {
 
   state.activeChatMessages.push(response.message);
   renderChatMessages();
-  refreshChats();
+  refreshChats(true);
 }
 
 function markChatAsRead(chatId) {
@@ -1495,6 +1511,15 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function isFetchStale(key, ttlMs) {
+  const last = Number(state.lastFetchAt?.[key] || 0);
+  return Date.now() - last > ttlMs;
+}
+
+function touchFetch(key) {
+  state.lastFetchAt[key] = Date.now();
 }
 
 function sleep(ms) {

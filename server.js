@@ -101,7 +101,19 @@ initFirebase();
 
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    maxAge: "7d",
+    etag: true,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-cache");
+      } else {
+        res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+      }
+    },
+  })
+);
 
 app.get("/health", async (_req, res) => {
   try {
@@ -455,7 +467,7 @@ app.get("/api/profiles/stack", async (req, res) => {
 
     const { rows } = await pool.query(
       `
-      SELECT ${buildUserSelect("u")}
+      SELECT ${buildSwipeCardSelect("u")}
       FROM users u
       WHERE u.id <> $1
         AND NOT EXISTS (
@@ -1087,6 +1099,26 @@ async function initDb() {
     `);
 
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_swipes_target_direction_created_at
+      ON swipes (target_id, direction, created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_matches_user_a_created_at
+      ON matches (user_a, created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_matches_user_b_created_at
+      ON matches (user_b, created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_created_at
+      ON users (created_at DESC);
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1355,6 +1387,20 @@ function buildUserSelect(alias = "") {
     ${p}show_age AS "showAge",
     ${p}show_distance AS "showDistance",
     ${p}created_at AS "createdAt"
+  `;
+}
+
+function buildSwipeCardSelect(alias = "") {
+  const p = alias ? `${alias}.` : "";
+  return `
+    ${p}id,
+    ${p}name,
+    ${p}age,
+    ${p}city,
+    ${p}bio,
+    ${p}photo_url AS "photoUrl",
+    ${p}interests,
+    ${p}relationship_goal AS "relationshipGoal"
   `;
 }
 
