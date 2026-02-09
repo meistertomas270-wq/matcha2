@@ -75,7 +75,9 @@ const btnAuthLoginTab = document.getElementById("btnAuthLoginTab");
 const btnAuthRegisterTab = document.getElementById("btnAuthRegisterTab");
 const loginForm = document.getElementById("loginForm");
 const loginSubmitBtn = loginForm?.querySelector('button[type="submit"]');
+const authErrorEl = document.getElementById("authError");
 const registerForm = document.getElementById("registerForm");
+const registerSubmitBtn = registerForm?.querySelector('button[type="submit"]');
 const registerPassword = document.getElementById("registerPassword");
 const registerPasswordConfirm = document.getElementById("registerPasswordConfirm");
 
@@ -91,6 +93,8 @@ const photoFilesInput = document.getElementById("photoFilesInput");
 const photoUrlsInput = document.getElementById("photoUrlsInput");
 const photoCountHint = document.getElementById("photoCountHint");
 const photoPreview = document.getElementById("photoPreview");
+const onboardingProgressBar = document.getElementById("onboardingProgressBar");
+const onboardingProgressText = document.getElementById("onboardingProgressText");
 const interestsPicker = document.getElementById("interestsPicker");
 const interestsInput = document.getElementById("interestsInput");
 const relationshipPicker = document.getElementById("relationshipPicker");
@@ -119,11 +123,11 @@ const toastEl = document.getElementById("toast");
 const TAB_META = {
   swipe: {
     title: "Para ti",
-    subtitle: () => `${state.stack.length || 0} perfiles listos para deslizar`,
+    subtitle: () => `${state.stack.length || 0} perfiles listos para descubrir`,
   },
   explore: {
     title: "Explorar",
-    subtitle: () => "Nuevas vibes, planes y objetivos en una sola vista.",
+    subtitle: () => "Planes, vibes y personas nuevas en una vista.",
   },
   likes: {
     title: "Likes",
@@ -187,6 +191,7 @@ bootstrap().catch((err) => {
 });
 
 async function bootstrap() {
+  enhanceNavLabels();
   bindEvents();
   renderExploreCatalog();
   renderScreenMeta();
@@ -227,6 +232,8 @@ function bindEvents() {
   btnAuthLoginTab?.addEventListener("click", () => setAuthTab("login"));
   btnAuthRegisterTab?.addEventListener("click", () => setAuthTab("register"));
   onboardingForm.addEventListener("submit", onCreateProfile);
+  onboardingForm.addEventListener("input", updateOnboardingProgress);
+  onboardingForm.addEventListener("change", updateOnboardingProgress);
   bindChipPicker(interestsPicker, interestsInput, Number(interestsPicker?.dataset.max || 6));
   bindChipPicker(languagesPicker, languagesInput, Number(languagesPicker?.dataset.max || 4));
   bindChipPicker(relationshipPicker, relationshipGoalInput, 1);
@@ -289,6 +296,7 @@ function bindEvents() {
 
   syncPoliticsPronouns();
   syncWorkFields();
+  updateOnboardingProgress();
 }
 
 async function onCreateProfile(event) {
@@ -391,6 +399,7 @@ async function onCreateProfile(event) {
   closeDialog(onboardingDialog);
   state.onboardingPhotoUrls = [];
   setOnboardingSubmitting(false);
+  updateOnboardingProgress();
   await setCurrentUser(created.user);
 }
 
@@ -583,16 +592,19 @@ function createSwipeCard(profile, isTop, index) {
 
   const tags =
     Array.isArray(profile.interests) && profile.interests.length
-      ? profile.interests.slice(0, 3)
+      ? profile.interests.slice(0, 2)
       : buildInterests(profile.id);
+  const relationship = String(profile.relationshipGoal || "").trim();
+  const subtitleParts = [profile.city || "Sin ciudad"];
+  if (relationship) subtitleParts.push(relationship);
   card.innerHTML = `
+    <div class="swipe-tint pass"></div>
+    <div class="swipe-tint like"></div>
     <div class="stamp pass">NOPE</div>
     <div class="stamp like">LIKE</div>
     <div class="card-meta">
       <h3 class="card-title">${escapeHtml(profile.name)}, ${Number(profile.age) || 0}</h3>
-      <p class="card-subtitle">${escapeHtml(profile.city || "Sin ciudad")} - ${escapeHtml(
-    profile.bio || ""
-  )}</p>
+      <p class="card-subtitle">${escapeHtml(subtitleParts.join(" · "))}</p>
       <div class="card-tags">
         ${tags.map((tag) => `<span class="card-tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
@@ -609,6 +621,7 @@ function attachDrag(card) {
   let dragging = false;
   let startX = 0;
   let deltaX = 0;
+  let vibratedDirection = "";
 
   card.addEventListener("pointerdown", (event) => {
     if (state.swiping) return;
@@ -624,6 +637,14 @@ function attachDrag(card) {
     card.style.transition = "none";
     card.style.transform = `translateX(${deltaX}px) rotate(${rotate}deg)`;
     paintStamps(card, deltaX);
+    const direction = deltaX > 110 ? "like" : deltaX < -110 ? "pass" : "";
+    if (direction && direction !== vibratedDirection && navigator.vibrate) {
+      navigator.vibrate(8);
+      vibratedDirection = direction;
+    }
+    if (!direction) {
+      vibratedDirection = "";
+    }
   });
 
   const release = async () => {
@@ -651,8 +672,17 @@ function attachDrag(card) {
 function paintStamps(card, dx) {
   const likeStamp = card.querySelector(".stamp.like");
   const passStamp = card.querySelector(".stamp.pass");
-  likeStamp.style.opacity = String(Math.max(0, Math.min(1, dx / 120)));
-  passStamp.style.opacity = String(Math.max(0, Math.min(1, -dx / 120)));
+  const likeTint = card.querySelector(".swipe-tint.like");
+  const passTint = card.querySelector(".swipe-tint.pass");
+  const likeProgress = Math.max(0, Math.min(1, dx / 140));
+  const passProgress = Math.max(0, Math.min(1, -dx / 140));
+
+  likeStamp.style.opacity = String(likeProgress);
+  passStamp.style.opacity = String(passProgress);
+  likeStamp.style.transform = `rotate(9deg) scale(${0.92 + likeProgress * 0.16})`;
+  passStamp.style.transform = `rotate(-9deg) scale(${0.92 + passProgress * 0.16})`;
+  if (likeTint) likeTint.style.opacity = String(likeProgress * 0.5);
+  if (passTint) passTint.style.opacity = String(passProgress * 0.5);
 }
 
 async function swipeTopCard(direction) {
@@ -920,6 +950,7 @@ async function onLoginSubmit(event) {
   if (state.loading.auth) return;
   state.loading.auth = true;
   setAuthSubmitting(true);
+  setAuthError("");
   const formData = new FormData(loginForm);
   const payload = {
     email: String(formData.get("email") || ""),
@@ -932,7 +963,9 @@ async function onLoginSubmit(event) {
       error: err?.message || "",
     }));
     if (!response?.ok || !response.user) {
-      showToast(mapAuthError(response?.error));
+      const message = mapAuthError(response?.error);
+      setAuthError(message);
+      showToast(message);
       return;
     }
 
@@ -949,9 +982,20 @@ async function onLoginSubmit(event) {
 
 async function onRegisterSubmit(event) {
   event.preventDefault();
-  if (!registerPassword || !registerPasswordConfirm) return;
+  if (state.loading.auth) return;
+  state.loading.auth = true;
+  setAuthSubmitting(true);
+  setAuthError("");
+  if (!registerPassword || !registerPasswordConfirm) {
+    state.loading.auth = false;
+    setAuthSubmitting(false);
+    return;
+  }
   if (registerPassword.value !== registerPasswordConfirm.value) {
+    setAuthError("Las contrasenas no coinciden");
     showToast("Las contrasenas no coinciden");
+    state.loading.auth = false;
+    setAuthSubmitting(false);
     return;
   }
 
@@ -962,13 +1006,19 @@ async function onRegisterSubmit(event) {
   };
   const response = await postJson("/api/auth/register", payload).catch((err) => ({ ok: false, error: err?.message || "" }));
   if (!response?.ok || !response.user) {
-    showToast(response?.error || "No se pudo registrar");
+    const message = response?.error || "No se pudo registrar";
+    setAuthError(message);
+    showToast(message);
+    state.loading.auth = false;
+    setAuthSubmitting(false);
     return;
   }
 
   closeDialog(authDialog);
   await setCurrentUser(response.user);
   openOnboarding();
+  state.loading.auth = false;
+  setAuthSubmitting(false);
 }
 
 function setAuthTab(mode) {
@@ -977,6 +1027,7 @@ function setAuthTab(mode) {
   btnAuthRegisterTab?.classList.toggle("active", !isLogin);
   loginForm?.classList.toggle("hidden", !isLogin);
   registerForm?.classList.toggle("hidden", isLogin);
+  setAuthError("");
 }
 
 async function registerServiceWorker() {
@@ -1069,6 +1120,7 @@ function openOnboarding() {
     dobInput.value = d.toISOString().slice(0, 10);
     syncBirthData();
   }
+  updateOnboardingProgress();
   openDialog(onboardingDialog);
 }
 
@@ -1077,6 +1129,7 @@ function openAuth() {
   loginForm?.reset();
   registerForm?.reset();
   setAuthTab("login");
+  setAuthError("");
   openDialog(authDialog);
 }
 
@@ -1205,6 +1258,7 @@ function hydrateOnboardingFromUser(user) {
     ? `${Math.min(user.photoUrls.length, 5)}/5 actuales`
     : "0/5 seleccionadas";
   syncBirthData();
+  updateOnboardingProgress();
 }
 
 function setFormValue(name, value) {
@@ -1238,6 +1292,7 @@ function bindChipPicker(container, hiddenInput, maxSelection) {
       String(el.dataset.value || "").trim()
     );
     hiddenInput.value = values.join(",");
+    updateOnboardingProgress();
   });
 }
 
@@ -1249,6 +1304,7 @@ function setChipValues(container, hiddenInput, values) {
     button.classList.toggle("active", set.has(value));
   });
   hiddenInput.value = Array.from(set).join(",");
+  updateOnboardingProgress();
 }
 
 function bindFoldSelects() {
@@ -1270,6 +1326,7 @@ async function onPhotosChanged() {
   const previewUrls = await readPhotoFiles(files);
   state.onboardingPhotoUrls = previewUrls.slice(0, 5);
   renderPhotoPreview(previewUrls);
+  updateOnboardingProgress();
 }
 
 function renderPhotoPreview(urls) {
@@ -1546,9 +1603,14 @@ function fetchWithTimeout(url, options, timeoutMs = 12000) {
 }
 
 function setAuthSubmitting(isSubmitting) {
-  if (!loginSubmitBtn) return;
-  loginSubmitBtn.disabled = isSubmitting;
-  loginSubmitBtn.textContent = isSubmitting ? "Entrando..." : "Entrar";
+  if (loginSubmitBtn) {
+    loginSubmitBtn.disabled = isSubmitting;
+    loginSubmitBtn.textContent = isSubmitting ? "Entrando..." : "Entrar";
+  }
+  if (registerSubmitBtn) {
+    registerSubmitBtn.disabled = isSubmitting;
+    registerSubmitBtn.textContent = isSubmitting ? "Creando..." : "Crear cuenta";
+  }
 }
 
 function mapAuthError(error) {
@@ -1558,6 +1620,50 @@ function mapAuthError(error) {
   if (code.includes("credentials_required")) return "Completa email y contrasena";
   if (code.includes("tiempo de espera")) return "Sin respuesta del servidor. Intenta de nuevo";
   return error;
+}
+
+function setAuthError(message) {
+  if (!authErrorEl) return;
+  const text = String(message || "").trim();
+  authErrorEl.textContent = text;
+  authErrorEl.classList.toggle("hidden", !text);
+}
+
+function enhanceNavLabels() {
+  const labels = {
+    swipe: "Para ti",
+    explore: "Explorar",
+    likes: "Likes",
+    chat: "Chat",
+    profile: "Perfil",
+  };
+  navButtons.forEach((button) => {
+    if (button.querySelector(".nav-label")) return;
+    const tab = String(button.dataset.tabBtn || "");
+    const label = document.createElement("span");
+    label.className = "nav-label";
+    label.textContent = labels[tab] || "Tab";
+    button.appendChild(label);
+  });
+}
+
+function updateOnboardingProgress() {
+  if (!onboardingForm || !onboardingProgressBar || !onboardingProgressText) return;
+  const formData = new FormData(onboardingForm);
+  const checks = [
+    String(formData.get("name") || "").trim().length >= 2,
+    String(formData.get("dob") || "").trim().length === 10,
+    String(formData.get("bio") || "").trim().length >= 10,
+    Array.isArray(state.onboardingPhotoUrls) && state.onboardingPhotoUrls.length > 0,
+    parseCsvField(interestsInput?.value || "").length > 0,
+    String(relationshipGoalInput?.value || "").trim().length > 0,
+    String(formData.get("gender") || "").trim().length > 0,
+    String(livingInInput?.value || formData.get("livingIn") || "").trim().length > 0,
+  ];
+  const completed = checks.filter(Boolean).length;
+  const pct = Math.round((completed / checks.length) * 100);
+  onboardingProgressBar.style.width = `${pct}%`;
+  onboardingProgressText.textContent = `${pct}% completo`;
 }
 
 function urlBase64ToUint8Array(base64String) {

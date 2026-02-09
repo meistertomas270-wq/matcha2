@@ -12,7 +12,7 @@
       <header class="screen-header">
         <div class="screen-title-wrap">
           <h1 id="screenTitle" class="screen-title">Para ti</h1>
-          <p id="screenSubtitle" class="screen-subtitle">Desliza y encuentra nuevas conexiones.</p>
+          <p id="screenSubtitle" class="screen-subtitle">Descubre personas cerca tuyo.</p>
         </div>
         <div class="header-actions">
           <button id="btnNotif" class="icon-btn" type="button" aria-label="Notificaciones"><span class="ui-icon">🔔</span></button>
@@ -149,6 +149,7 @@
         <button id="btnAuthLoginTab" class="auth-tab active" type="button">Iniciar sesion</button>
         <button id="btnAuthRegisterTab" class="auth-tab" type="button">Registrarse</button>
       </div>
+      <p id="authError" class="form-error hidden" role="alert" aria-live="polite"></p>
 
       <form id="loginForm" class="auth-form">
         <label>
@@ -182,7 +183,9 @@
 
   <dialog id="onboardingDialog" class="modal">
     <form id="onboardingForm" class="modal-form">
-      <h2>Editar perfil</h2>
+      <h2>Completa tu perfil</h2>
+      <div class="onb-progress-track"><span id="onboardingProgressBar"></span></div>
+      <p id="onboardingProgressText" class="onb-progress-text">0% completo</p>
 
       <label>
         Nombre
@@ -488,7 +491,7 @@
         <input name="showDistance" type="checkbox" checked />
       </label>
 
-      <button type="submit" class="form-primary">Entrar</button>
+      <button type="submit" class="form-primary">Guardar perfil</button>
     </form>
   </dialog>
 

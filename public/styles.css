@@ -176,6 +176,23 @@ body {
   );
 }
 
+.swipe-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 90ms linear;
+  pointer-events: none;
+}
+
+.swipe-tint.like {
+  background: linear-gradient(120deg, rgba(39, 180, 88, 0.04), rgba(39, 180, 88, 0.42));
+}
+
+.swipe-tint.pass {
+  background: linear-gradient(240deg, rgba(220, 57, 57, 0.04), rgba(220, 57, 57, 0.42));
+}
+
 .card-meta {
   position: absolute;
   left: 14px;
@@ -1546,5 +1563,237 @@ body {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+:root {
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --space-5: 24px;
+  --shadow-card: 0 16px 40px rgba(1, 7, 18, 0.55);
+}
+
+.screen-header {
+  padding: 16px 16px 10px;
+  backdrop-filter: blur(12px);
+}
+
+.screen-title {
+  font-size: 31px;
+  font-weight: 800;
+}
+
+.screen-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.screen-main {
+  padding: 10px 12px 20px;
+}
+
+.deck {
+  height: min(74vh, 650px);
+  min-height: 500px;
+}
+
+.card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card::after {
+  background: linear-gradient(
+    to top,
+    rgba(2, 4, 9, 0.88) 15%,
+    rgba(2, 4, 9, 0.38) 52%,
+    rgba(2, 4, 9, 0.06) 82%
+  );
+}
+
+.card-meta {
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+}
+
+.card-title {
+  font-size: 32px;
+  letter-spacing: 0.1px;
+}
+
+.card-subtitle {
+  margin: 3px 0 10px;
+  font-size: 13px;
+  color: #f3f6ff;
+}
+
+.card-tags {
+  gap: 8px;
+}
+
+.card-tag {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(7, 13, 26, 0.45);
+}
+
+.stamp {
+  padding: 6px 12px;
+  font-size: 19px;
+  letter-spacing: 1px;
+}
+
+.swipe-actions {
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.round-action {
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(27, 42, 69, 0.95), rgba(16, 24, 41, 0.95));
+}
+
+.round-action.small {
+  width: 46px;
+  height: 46px;
+}
+
+.bottom-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(6, 10, 19, 0.94);
+  backdrop-filter: blur(14px);
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.nav-btn {
+  border-radius: 12px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: rgba(232, 240, 255, 0.72);
+}
+
+.nav-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.nav-label {
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  font-weight: 600;
+}
+
+.nav-btn.active {
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 58, 112, 0.2), rgba(255, 58, 112, 0.09));
+  box-shadow: inset 0 0 0 1px rgba(255, 94, 140, 0.35);
+}
+
+.modal-form,
+.auth-shell {
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.auth-title {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.auth-subtitle {
+  margin-bottom: 12px;
+}
+
+.auth-tab {
+  border-radius: 999px;
+}
+
+.auth-primary {
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.form-error {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #ffd4df;
+  background: rgba(178, 41, 84, 0.26);
+  border: 1px solid rgba(255, 96, 147, 0.28);
+}
+
+.onb-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+#onboardingProgressBar {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff4b83, #ff8a5b);
+  transition: width 170ms ease;
+}
+
+.onb-progress-text {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.modal-form label,
+.modal-form details,
+.onb-group {
+  margin-bottom: 10px;
+}
+
+.chip-btn {
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.chip-btn.active {
+  background: linear-gradient(180deg, rgba(255, 70, 124, 0.4), rgba(255, 70, 124, 0.22));
+  border-color: rgba(255, 100, 146, 0.5);
+}
+
+.toast {
+  border-radius: 12px;
+  padding: 10px 12px;
+  backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }
