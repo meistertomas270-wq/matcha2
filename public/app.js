@@ -640,7 +640,7 @@ function createSwipeCard(profile, isTop, index) {
     <div class="stamp like">❤</div>
     <div class="card-meta">
       <h3 class="card-title">${escapeHtml(profile.name)}, ${Number(profile.age) || 0}</h3>
-      <p class="card-subtitle">${escapeHtml(subtitleParts.join(" · "))}</p>
+      <p class="card-subtitle">${escapeHtml(subtitleParts.join(" - "))}</p>
       <div class="card-tags">
         ${tags.map((tag) => `<span class="card-tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
@@ -657,8 +657,8 @@ function createSwipeCard(profile, isTop, index) {
   });
   const likeStampEl = card.querySelector(".stamp.like");
   const passStampEl = card.querySelector(".stamp.pass");
-  if (likeStampEl) likeStampEl.innerHTML = "&#10084;";
-  if (passStampEl) passStampEl.innerHTML = "&#10005;";
+  if (likeStampEl) likeStampEl.textContent = "LIKE";
+  if (passStampEl) passStampEl.textContent = "NOPE";
 
   if (isTop) {
     attachDrag(card);
